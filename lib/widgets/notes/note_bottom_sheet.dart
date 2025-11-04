@@ -601,9 +601,10 @@ class _NoteBottomSheetState extends State<NoteBottomSheet> {
                 itemCount: items.length,
                 separatorBuilder: (context, index) => Divider(
                   height: 1,
+                  thickness: 0.5,
                   indent: 20,
                   endIndent: 20,
-                  color: Colors.grey[150],
+                  color: Colors.grey[200],
                 ),
                 itemBuilder: (context, index) {
                   final item = items[index];
