@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "323715532903",
+    "project_id": "mind-library-app",
+    "storage_bucket": "mind-library-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:323715532903:android:7418cc24bf27cdff446cc2",
+        "android_client_info": {
+          "package_name": "com.example.mind_library"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCISd_IZ-4LcOLjB4ybTPD1AAZth9hGjpY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
