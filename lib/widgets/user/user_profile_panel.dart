@@ -1,6 +1,7 @@
 // lib/widgets/user/user_profile_panel.dart
 
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/svg.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:crop_your_image/crop_your_image.dart';
@@ -9,6 +10,7 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'dart:io';
 import 'dart:typed_data';
 import '../../providers/auth_provider.dart';
+import '../../providers/theme_provider.dart';
 import '../../utils/app_colors.dart';
 
 class UserProfilePanel extends StatefulWidget {
@@ -57,6 +59,9 @@ class _UserProfilePanelState extends State<UserProfilePanel> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
     final authProvider = context.watch<AuthProvider>();
     final userName = authProvider.user?.displayName ?? 'Usuario';
     final userEmail = authProvider.user?.email ?? '';
@@ -65,9 +70,10 @@ class _UserProfilePanelState extends State<UserProfilePanel> {
     final coverPhotoUrl = authProvider.customCoverPhotoUrl;
 
     return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      decoration: BoxDecoration(
+        // ✅ Blanco puro en claro, gris oscuro en dark
+        color: isDark ? AppColors.surfaceDark : Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -78,7 +84,7 @@ class _UserProfilePanelState extends State<UserProfilePanel> {
             width: 40,
             height: 4,
             decoration: BoxDecoration(
-              color: AppColors.grey300,
+              color: isDark ? AppColors.grey700 : AppColors.grey300,
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -113,20 +119,33 @@ class _UserProfilePanelState extends State<UserProfilePanel> {
                     width: 40,
                     height: 40,
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.95),
+                      // ✅ Blanco puro en claro, gris oscuro en dark
+                      color: (isDark ? AppColors.surfaceDark : Colors.white)
+                          .withValues(alpha: 0.95),
                       borderRadius: BorderRadius.circular(12),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.08),
+                          color: isDark
+                              ? AppColors.shadowDark
+                              : AppColors.shadowLight,
                           blurRadius: 8,
                           offset: const Offset(0, 2),
                         ),
                       ],
                     ),
-                    child: Icon(
-                      Icons.settings_outlined,
-                      color: AppColors.grey700,
-                      size: 22,
+                    child: Center(
+                      child: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: SvgPicture.asset(
+                          'assets/icons/setting.svg',
+                          colorFilter: ColorFilter.mode(
+                            colorScheme.onSurface.withValues(alpha: 0.9),
+                            BlendMode.srcIn,
+                          ),
+                          fit: BoxFit.contain,
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -144,16 +163,17 @@ class _UserProfilePanelState extends State<UserProfilePanel> {
               children: [
                 Text(
                   userName,
-                  style: const TextStyle(
+                  style: theme.textTheme.titleLarge?.copyWith(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
-                    color: Colors.black87,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   userEmail,
-                  style: TextStyle(fontSize: 14, color: AppColors.grey600),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurface.withValues(alpha: 0.7),
+                  ),
                 ),
               ],
             ),
@@ -179,11 +199,14 @@ class _UserProfilePanelState extends State<UserProfilePanel> {
                           _isEditMode = false;
                         });
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Cambios guardados'),
+                          SnackBar(
+                            content: const Text('Cambios guardados'),
                             backgroundColor: AppColors.success,
                             behavior: SnackBarBehavior.floating,
-                            duration: Duration(seconds: 1),
+                            duration: const Duration(seconds: 1),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                           ),
                         );
                       },
@@ -208,9 +231,7 @@ class _UserProfilePanelState extends State<UserProfilePanel> {
                           ? null
                           : () => _showLogoutDialog(context),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(
-                          0xFFEF5350,
-                        ), // Rojo más suave
+                        backgroundColor: AppColors.error,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -258,7 +279,12 @@ class _UserProfilePanelState extends State<UserProfilePanel> {
       ancestor: overlay,
     );
 
-    const double menuWidth = 160;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final themeProvider = context.read<ThemeProvider>();
+
+    const double menuWidth = 200;
 
     final RelativeRect position = RelativeRect.fromLTRB(
       buttonPosition.dx + button.size.width - menuWidth,
@@ -272,35 +298,95 @@ class _UserProfilePanelState extends State<UserProfilePanel> {
     showMenu<String>(
       context: context,
       position: position,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       elevation: 8,
-      color: Colors.white,
+      // ✅ Blanco puro en claro, gris oscuro en dark
+      color: isDark ? AppColors.surfaceDark : Colors.white,
       items: [
+        // Opción Editar
         PopupMenuItem<String>(
           value: 'edit',
-          height: 48,
+          height: 56,
           child: Row(
             children: [
               Container(
-                width: 32,
-                height: 32,
+                width: 36,
+                height: 36,
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
+                  color: colorScheme.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.edit_outlined,
-                  color: AppColors.primary,
-                  size: 18,
+                  color: colorScheme.primary,
+                  size: 20,
                 ),
               ),
-              const SizedBox(width: 12),
-              const Text(
-                'Editar',
-                style: TextStyle(
-                  fontSize: 15,
+              const SizedBox(width: 14),
+              Text(
+                'Editar Perfil',
+                style: theme.textTheme.bodyLarge?.copyWith(
                   fontWeight: FontWeight.w600,
-                  color: Colors.black87,
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // Divisor
+        PopupMenuItem<String>(
+          enabled: false,
+          height: 1,
+          padding: EdgeInsets.zero,
+          child: Divider(
+            height: 1,
+            color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
+          ),
+        ),
+
+        // Opción Cambiar Tema
+        PopupMenuItem<String>(
+          value: 'theme',
+          height: 56,
+          child: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: themeProvider.isDarkMode
+                      ? AppColors.warning.withValues(alpha: 0.1)
+                      : AppColors.info.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  themeProvider.isDarkMode
+                      ? Icons.light_mode_outlined
+                      : Icons.dark_mode_outlined,
+                  color: themeProvider.isDarkMode
+                      ? AppColors.warning
+                      : AppColors.info,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Text(
+                  themeProvider.isDarkMode ? 'Modo Claro' : 'Modo Oscuro',
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              // Indicador visual del tema actual
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: themeProvider.isDarkMode
+                      ? AppColors.warning
+                      : AppColors.info,
+                  shape: BoxShape.circle,
                 ),
               ),
             ],
@@ -312,12 +398,18 @@ class _UserProfilePanelState extends State<UserProfilePanel> {
         setState(() {
           _isEditMode = true;
         });
+      } else if (value == 'theme') {
+        themeProvider.toggleTheme();
       }
     });
   }
 
   // ========== COVER PHOTO ==========
   Widget _buildCoverPhoto(String? coverUrl, bool isUpdating) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
     return GestureDetector(
       onTap: _isEditMode && !isUpdating
           ? () => _pickImage(isProfile: false)
@@ -328,7 +420,7 @@ class _UserProfilePanelState extends State<UserProfilePanel> {
             height: 140,
             margin: const EdgeInsets.symmetric(horizontal: 16),
             decoration: BoxDecoration(
-              color: AppColors.grey200,
+              color: colorScheme.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(20),
               image: coverUrl != null
                   ? DecorationImage(
@@ -345,14 +437,13 @@ class _UserProfilePanelState extends State<UserProfilePanel> {
                         Icon(
                           Icons.image_outlined,
                           size: 40,
-                          color: AppColors.grey400,
+                          color: colorScheme.onSurface.withValues(alpha: 0.4),
                         ),
                         const SizedBox(height: 8),
                         Text(
                           'Agregar portada',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: AppColors.grey500,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurface.withValues(alpha: 0.5),
                             fontWeight: FontWeight.w500,
                           ),
                         ),
@@ -374,13 +465,19 @@ class _UserProfilePanelState extends State<UserProfilePanel> {
                   child: Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.9),
+                      // ✅ Blanco puro en claro, gris oscuro en dark
+                      color: (isDark ? AppColors.surfaceDark : Colors.white)
+                          .withValues(alpha: 0.95),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(
-                      Icons.camera_alt_outlined,
-                      color: Colors.black87,
-                      size: 24,
+                    child: SvgPicture.asset(
+                      'assets/icons/image_edit.svg',
+                      width: 20,
+                      height: 20,
+                      colorFilter: ColorFilter.mode(
+                        colorScheme.onSurface.withValues(alpha: 0.9),
+                        BlendMode.srcIn,
+                      ),
                     ),
                   ),
                 ),
@@ -395,9 +492,11 @@ class _UserProfilePanelState extends State<UserProfilePanel> {
                   color: Colors.black.withValues(alpha: 0.5),
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: const Center(
+                child: Center(
                   child: CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      colorScheme.primary,
+                    ),
                   ),
                 ),
               ),
@@ -409,6 +508,10 @@ class _UserProfilePanelState extends State<UserProfilePanel> {
 
   // ========== AVATAR ==========
   Widget _buildAvatar(String? userPhotoUrl, bool isUpdating) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
     return GestureDetector(
       onTap: _isEditMode && !isUpdating
           ? () => _pickImage(isProfile: true)
@@ -419,12 +522,16 @@ class _UserProfilePanelState extends State<UserProfilePanel> {
             width: 90,
             height: 90,
             decoration: BoxDecoration(
-              color: AppColors.grey300,
+              color: colorScheme.surfaceContainerHighest,
               shape: BoxShape.circle,
-              border: Border.all(color: Colors.white, width: 4),
+              border: Border.all(
+                // ✅ Blanco puro en claro, gris oscuro en dark
+                color: isDark ? AppColors.surfaceDark : Colors.white,
+                width: 4,
+              ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.1),
+                  color: isDark ? AppColors.shadowDark : AppColors.shadowLight,
                   blurRadius: 12,
                   offset: const Offset(0, 4),
                 ),
@@ -437,7 +544,11 @@ class _UserProfilePanelState extends State<UserProfilePanel> {
                   : null,
             ),
             child: userPhotoUrl == null
-                ? Icon(Icons.person_outline, size: 40, color: AppColors.grey500)
+                ? Icon(
+                    Icons.person_outline,
+                    size: 40,
+                    color: colorScheme.onSurface.withValues(alpha: 0.5),
+                  )
                 : null,
           ),
           // Indicador de edición
@@ -448,19 +559,29 @@ class _UserProfilePanelState extends State<UserProfilePanel> {
               decoration: BoxDecoration(
                 color: Colors.black.withValues(alpha: 0.3),
                 shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 4),
+                border: Border.all(
+                  // ✅ Blanco puro en claro, gris oscuro en dark
+                  color: isDark ? AppColors.surfaceDark : Colors.white,
+                  width: 4,
+                ),
               ),
               child: Center(
                 child: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.9),
+                    // ✅ Blanco puro en claro, gris oscuro en dark
+                    color: (isDark ? AppColors.surfaceDark : Colors.white)
+                        .withValues(alpha: 0.95),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(
-                    Icons.camera_alt_outlined,
-                    color: Colors.black87,
-                    size: 20,
+                  child: SvgPicture.asset(
+                    'assets/icons/image_edit.svg',
+                    width: 20,
+                    height: 20,
+                    colorFilter: ColorFilter.mode(
+                      colorScheme.onSurface.withValues(alpha: 0.9),
+                      BlendMode.srcIn,
+                    ),
                   ),
                 ),
               ),
@@ -473,12 +594,18 @@ class _UserProfilePanelState extends State<UserProfilePanel> {
               decoration: BoxDecoration(
                 color: Colors.black.withValues(alpha: 0.5),
                 shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 4),
+                border: Border.all(
+                  // ✅ Blanco puro en claro, gris oscuro en dark
+                  color: isDark ? AppColors.surfaceDark : Colors.white,
+                  width: 4,
+                ),
               ),
-              child: const Center(
+              child: Center(
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    colorScheme.primary,
+                  ),
                 ),
               ),
             ),
@@ -489,13 +616,21 @@ class _UserProfilePanelState extends State<UserProfilePanel> {
 
   // ========== STATISTICS - MINIMALISTA ==========
   Widget _buildStatistics() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 24),
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       decoration: BoxDecoration(
-        color: const Color.fromARGB(255, 255, 255, 255),
+        // ✅ Blanco puro en claro, gris oscuro en dark
+        color: isDark ? AppColors.surfaceDark : Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.grey200, width: 1),
+        border: Border.all(
+          color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
+          width: 1,
+        ),
       ),
       child: Row(
         children: [
@@ -505,32 +640,34 @@ class _UserProfilePanelState extends State<UserProfilePanel> {
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(
-                    Icons.book_outlined,
-                    size: 24,
-                    color: AppColors.primary,
+                  child: SvgPicture.asset(
+                    'assets/icons/book_open.svg',
+                    width: 20,
+                    height: 20,
+                    colorFilter: ColorFilter.mode(
+                      colorScheme.onSurface.withValues(alpha: 0.9),
+                      BlendMode.srcIn,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       '0',
-                      style: TextStyle(
+                      style: theme.textTheme.titleLarge?.copyWith(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
-                        color: Colors.black87,
                       ),
                     ),
                     Text(
                       'Libros leídos',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.grey600,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurface.withValues(alpha: 0.7),
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -542,7 +679,7 @@ class _UserProfilePanelState extends State<UserProfilePanel> {
           Container(
             width: 1,
             height: 44,
-            color: AppColors.grey300,
+            color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
             margin: const EdgeInsets.symmetric(horizontal: 16),
           ),
           Expanded(
@@ -551,32 +688,34 @@ class _UserProfilePanelState extends State<UserProfilePanel> {
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(
-                    Icons.access_time_outlined,
-                    size: 24,
-                    color: AppColors.secondary,
+                  child: SvgPicture.asset(
+                    'assets/icons/clock.svg',
+                    width: 20,
+                    height: 20,
+                    colorFilter: ColorFilter.mode(
+                      colorScheme.onSurface.withValues(alpha: 0.9),
+                      BlendMode.srcIn,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       '0',
-                      style: TextStyle(
+                      style: theme.textTheme.titleLarge?.copyWith(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
-                        color: Colors.black87,
                       ),
                     ),
                     Text(
                       'Minutos',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.grey600,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurface.withValues(alpha: 0.7),
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -629,6 +768,9 @@ class _UserProfilePanelState extends State<UserProfilePanel> {
     required bool isProfile,
   }) async {
     final cropController = CropController();
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
 
     await showDialog(
       context: context,
@@ -642,7 +784,7 @@ class _UserProfilePanelState extends State<UserProfilePanel> {
               children: [
                 // Header
                 Container(
-                  color: Colors.black87,
+                  color: isDark ? AppColors.grey850 : AppColors.grey900,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 16,
                     vertical: 12,
@@ -700,7 +842,7 @@ class _UserProfilePanelState extends State<UserProfilePanel> {
                       width: size,
                       height: size,
                       decoration: BoxDecoration(
-                        color: AppColors.primary,
+                        color: colorScheme.primary,
                         shape: BoxShape.circle,
                       ),
                     ),
@@ -740,22 +882,7 @@ class _UserProfilePanelState extends State<UserProfilePanel> {
 
       if (!mounted) return;
 
-      if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              isProfile ? 'Foto de perfil actualizada' : 'Portada actualizada',
-            ),
-            backgroundColor: AppColors.success,
-            behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 2),
-          ),
-        );
-      } else {
-        final errorMsg =
-            authProvider.errorMessage ?? 'Error al subir la imagen';
-        _showErrorSnackBar(errorMsg);
-      }
+      if (success) {}
     } catch (e) {
       debugPrint('❌ Error en _saveCroppedImage: $e');
       if (mounted) {
@@ -812,25 +939,43 @@ class _UserProfilePanelState extends State<UserProfilePanel> {
   }
 
   void _showPermissionDialog() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Permiso Requerido'),
-        content: const Text(
+        // ✅ Blanco puro en claro, gris oscuro en dark
+        backgroundColor: isDark ? AppColors.surfaceDark : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('Permiso Requerido', style: theme.textTheme.titleLarge),
+        content: Text(
           'La app necesita acceso a tus fotos para cambiar tu imagen de perfil.',
+          style: theme.textTheme.bodyMedium,
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar'),
+            child: Text(
+              'Cancelar',
+              style: TextStyle(
+                color: colorScheme.onSurface.withValues(alpha: 0.7),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context);
               openAppSettings();
             },
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: colorScheme.primary,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
             child: const Text('Configuración'),
           ),
         ],
@@ -844,29 +989,41 @@ class _UserProfilePanelState extends State<UserProfilePanel> {
         content: Text(message),
         backgroundColor: AppColors.error,
         behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
   }
 
   // ========== LOGOUT DIALOG ==========
   void _showLogoutDialog(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
     final authProvider = context.read<AuthProvider>();
 
     showDialog(
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
+          // ✅ Blanco puro en claro, gris oscuro en dark
+          backgroundColor: isDark ? AppColors.surfaceDark : Colors.white,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(20),
           ),
-          title: const Text('Cerrar Sesión'),
-          content: const Text('¿Estás seguro de que deseas cerrar sesión?'),
+          title: Text('Cerrar Sesión', style: theme.textTheme.titleLarge),
+          content: Text(
+            '¿Estás seguro de que deseas cerrar sesión?',
+            style: theme.textTheme.bodyMedium,
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dialogContext),
               child: Text(
                 'Cancelar',
-                style: TextStyle(color: AppColors.grey700),
+                style: TextStyle(
+                  color: colorScheme.onSurface.withValues(alpha: 0.7),
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
             ElevatedButton(
@@ -877,15 +1034,18 @@ class _UserProfilePanelState extends State<UserProfilePanel> {
                 await authProvider.logout();
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFEF5350), // Rojo más suave
+                backgroundColor: AppColors.error,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(12),
                 ),
                 elevation: 0,
               ),
               child: const Text(
                 'Cerrar Sesión',
-                style: TextStyle(color: Colors.white),
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ],

@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:intl/intl.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/folder_provider.dart';
+import '../../providers/task_provider.dart';
 import '../../models/folder_model.dart';
-import '../../widgets/home/compact_clock_widget.dart';
 import '../../widgets/library/folder_item.dart';
 import '../../widgets/library/create_folder_widget.dart';
 import '../../widgets/library/select_folder_widget.dart';
@@ -13,6 +14,10 @@ import '../../widgets/common/animated_lottie_avatar.dart';
 import '../../widgets/user/user_profile_panel.dart';
 import '../../utils/app_colors.dart';
 import '../../screens/notes/notes_list_screen.dart';
+import '../../widgets/home/multi_action_fab.dart';
+import '../../widgets/notes/note_bottom_sheet.dart';
+import '../task/task_groups_screen.dart';
+import '../search/search_book_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -27,15 +32,9 @@ class _HomeScreenState extends State<HomeScreen>
   bool _isSelectionMode = false;
   final Set<String> _selectedFolderIds = {};
 
-  // GlobalKey para el botón de 3 puntos
-  final GlobalKey _moreButtonKey = GlobalKey();
-
   // Controlador de animación para FAB
   late AnimationController _fabAnimationController;
   late Animation<Offset> _fabSlideAnimation;
-
-  // Enum para ordenamiento
-  FolderSortOption _currentSortOption = FolderSortOption.dateDesc;
 
   @override
   void initState() {
@@ -54,6 +53,17 @@ class _HomeScreenState extends State<HomeScreen>
         );
 
     _fabAnimationController.value = 0.0;
+
+    // 🆕 Inicializar streams de tareas para el Home
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final authProvider = context.read<AuthProvider>();
+      final taskProvider = context.read<TaskProvider>();
+      final userId = authProvider.user?.uid ?? '';
+
+      if (userId.isNotEmpty) {
+        taskProvider.initHomeStreams(userId);
+      }
+    });
   }
 
   @override
@@ -83,7 +93,10 @@ class _HomeScreenState extends State<HomeScreen>
   @override
   Widget build(BuildContext context) {
     final folderProvider = context.watch<FolderProvider>();
+    final taskProvider = context.watch<TaskProvider>();
     final totalBooks = _calculateTotalBooks(folderProvider.folders);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final upcomingTasks = taskProvider.getUpcomingTasks();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_isSelectionMode && _fabAnimationController.value == 0.0) {
@@ -103,28 +116,37 @@ class _HomeScreenState extends State<HomeScreen>
         }
       },
       child: Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor: isDark
+            ? Theme.of(context).scaffoldBackgroundColor
+            : Colors.white,
         body: SafeArea(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildMainHeader(context, folderProvider, totalBooks),
               const SizedBox(height: 16),
-              _buildActionsBar(context),
-              const SizedBox(height: 24),
+              _buildActionsBar(context, isDark),
+              const SizedBox(height: 16),
+              // 🆕 Sección de tareas pendientes
+              if (upcomingTasks.isNotEmpty) ...[
+                _buildUpcomingTasksSection(upcomingTasks, taskProvider, isDark),
+                const SizedBox(height: 16),
+              ],
               Expanded(
                 child: folderProvider.folders.isEmpty
                     ? _buildEmptyState(context)
-                    : _buildFoldersGrid(
-                        _getSortedFolders(folderProvider.folders),
-                      ),
+                    : _buildFoldersGrid(folderProvider.folders),
               ),
             ],
           ),
         ),
         floatingActionButton: SlideTransition(
           position: _fabSlideAnimation,
-          child: _buildModernFAB(),
+          child: MultiActionFab(
+            onCreateFolder: _navigateToCreateFolder,
+            onCreateNote: _navigateToCreateNote,
+            onCreateChecklist: _navigateToTaskGroups,
+          ),
         ),
         floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
         bottomNavigationBar: AnimatedSwitcher(
@@ -142,55 +164,114 @@ class _HomeScreenState extends State<HomeScreen>
             );
           },
           child: _isSelectionMode
-              ? _buildSelectionBottomBar()
+              ? _buildSelectionBottomBar(isDark)
               : const SizedBox.shrink(),
         ),
       ),
     );
   }
 
-  Widget _buildModernFAB() {
-    return Transform.translate(
-      offset: const Offset(28, 0),
-      child: Container(
-        width: 84,
-        height: 64,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(32),
-            bottomLeft: Radius.circular(32),
+  // 🆕 Widget de sección de tareas pendientes
+  Widget _buildUpcomingTasksSection(
+    List<dynamic> tasks,
+    TaskProvider taskProvider,
+    bool isDark,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Tareas pendientes',
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.5,
+            ),
           ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.08),
-              blurRadius: 12,
-              offset: const Offset(-2, 0),
-              spreadRadius: 2,
-            ),
-          ],
-        ),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(32),
-              bottomLeft: Radius.circular(32),
-            ),
-            onTap: () => _navigateToCreateFolder(),
-            child: Center(
-              child: SvgPicture.asset(
-                'assets/icons/folder_add.svg',
-                width: 30,
-                height: 30,
-                colorFilter: const ColorFilter.mode(
-                  Colors.black87,
-                  BlendMode.srcIn,
+          const SizedBox(height: 12),
+          ...tasks.map((task) {
+            final dueDate = task.dueDate as DateTime?;
+            final isOverdue =
+                dueDate != null && dueDate.isBefore(DateTime.now());
+
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                children: [
+                  Text(
+                    '›',
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: isDark
+                          ? AppColors.textHintDark
+                          : AppColors.textHintLight,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      task.title,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w500,
+                        letterSpacing: -0.2,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  if (dueDate != null)
+                    Text(
+                      DateFormat('dd MMM').format(dueDate),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: isOverdue
+                            ? AppColors.error
+                            : (isDark
+                                  ? AppColors.textHintDark
+                                  : AppColors.textHintLight),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                ],
+              ),
+            );
+          }),
+          const SizedBox(height: 12),
+          // Divisor sutil
+          Center(
+            child: Container(
+              width: 120,
+              height: 1,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.transparent,
+                    (isDark
+                        ? Colors.white.withValues(alpha: 0.1)
+                        : Colors.black.withValues(alpha: 0.1)),
+                    Colors.transparent,
+                  ],
                 ),
               ),
             ),
           ),
-        ),
+          const SizedBox(height: 12),
+          Center(
+            child: GestureDetector(
+              onTap: _navigateToTaskGroups,
+              child: Text(
+                'Ver todas',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.primary,
+                  fontWeight: FontWeight.w600,
+                  decoration: TextDecoration.underline,
+                  decorationColor: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -204,24 +285,23 @@ class _HomeScreenState extends State<HomeScreen>
       padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
       child: Column(
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [const CompactClockWidget()],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            _isSelectionMode
-                ? '${_selectedFolderIds.length} seleccionado(s)'
-                : 'Carpetas',
-            style: Theme.of(context).textTheme.displayLarge,
-            textAlign: TextAlign.center,
+          Center(
+            child: Text(
+              _isSelectionMode
+                  ? '${_selectedFolderIds.length} seleccionado(s)'
+                  : 'Carpetas',
+              style: Theme.of(context).textTheme.displayLarge,
+              textAlign: TextAlign.center,
+            ),
           ),
           const SizedBox(height: 8),
-          Text(
-            '${provider.foldersCount} ${provider.foldersCount == 1 ? 'carpeta' : 'carpetas'}, $totalBooks ${totalBooks == 1 ? 'libro' : 'libros'}',
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              color: AppColors.textSecondary,
-              fontWeight: FontWeight.w500,
+          Center(
+            child: Text(
+              '${provider.foldersCount} ${provider.foldersCount == 1 ? 'carpeta' : 'carpetas'}, $totalBooks ${totalBooks == 1 ? 'libro' : 'libros'}',
+              style: Theme.of(
+                context,
+              ).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500),
+              textAlign: TextAlign.center,
             ),
           ),
         ],
@@ -229,11 +309,15 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  Widget _buildActionsBar(BuildContext context) {
+  Widget _buildActionsBar(BuildContext context, bool isDark) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: const BoxDecoration(color: Colors.white),
+      decoration: BoxDecoration(
+        color: isDark
+            ? Theme.of(context).scaffoldBackgroundColor
+            : Colors.white,
+      ),
       child: Row(
         children: [
           if (_isSelectionMode) ...[
@@ -247,13 +331,12 @@ class _HomeScreenState extends State<HomeScreen>
                     _buildSelectionCircle(
                       isSelected: _isAllSelected(),
                       size: 24,
+                      isDark: isDark,
                     ),
                     const SizedBox(height: 4),
-                    const Text(
+                    Text(
                       'Todas',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: AppColors.textSecondary,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -270,21 +353,21 @@ class _HomeScreenState extends State<HomeScreen>
             ),
             const Spacer(),
             _buildActionButton(
-              svgPath: 'assets/icons/add_file.svg',
+              svgPath: 'assets/icons/add_pdf.svg',
               onTap: _showUploadDocumentFlow,
+              isDark: isDark,
             ),
             const SizedBox(width: 4),
             _buildActionButton(
-              svgPath: 'assets/icons/note_icon.svg',
+              svgPath: 'assets/icons/notification_status.svg',
               onTap: _navigateToNotes,
+              isDark: isDark,
             ),
             const SizedBox(width: 4),
-            _buildActionButton(icon: Icons.search_rounded, onTap: () {}),
-            const SizedBox(width: 4),
             _buildActionButton(
-              key: _moreButtonKey,
-              icon: Icons.more_vert_rounded,
-              onTap: _showMoreOptionsPopup,
+              icon: Icons.search_rounded,
+              onTap: _navigateToSearch,
+              isDark: isDark,
             ),
           ],
         ],
@@ -297,6 +380,7 @@ class _HomeScreenState extends State<HomeScreen>
     final userPhotoUrl =
         authProvider.customProfilePhotoUrl ?? authProvider.user?.photoURL;
     final isUpdating = authProvider.isUpdatingProfile;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return _PulseButton(
       onTap: isUpdating ? null : _showUserPanel,
@@ -307,17 +391,30 @@ class _HomeScreenState extends State<HomeScreen>
             height: 40,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: AppColors.grey300, width: 2.5),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.06),
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
-                ),
-              ],
+              // 🆕 Solo mostrar borde si hay foto de perfil
+              border: userPhotoUrl != null
+                  ? Border.all(
+                      color:
+                          Theme.of(context).dividerTheme.color ?? Colors.grey,
+                      width: 2.5,
+                    )
+                  : null,
+              boxShadow: userPhotoUrl != null
+                  ? [
+                      BoxShadow(
+                        color: isDark
+                            ? Colors.black.withValues(alpha: 0.3)
+                            : Colors.black.withValues(alpha: 0.06),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ]
+                  : null,
             ),
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(17.5),
+              borderRadius: BorderRadius.circular(
+                userPhotoUrl != null ? 17.5 : 20,
+              ),
               child: userPhotoUrl != null
                   ? Image.network(
                       userPhotoUrl,
@@ -330,7 +427,7 @@ class _HomeScreenState extends State<HomeScreen>
                             height: 20,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: AppColors.primary,
+                              color: Theme.of(context).colorScheme.primary,
                               value: loadingProgress.expectedTotalBytes != null
                                   ? loadingProgress.cumulativeBytesLoaded /
                                         loadingProgress.expectedTotalBytes!
@@ -385,7 +482,7 @@ class _HomeScreenState extends State<HomeScreen>
       errorWidget: Icon(
         Icons.person_rounded,
         size: 24,
-        color: AppColors.textSecondary,
+        color: Theme.of(context).textTheme.bodyMedium?.color,
       ),
     );
   }
@@ -395,6 +492,7 @@ class _HomeScreenState extends State<HomeScreen>
     IconData? icon,
     String? svgPath,
     required VoidCallback onTap,
+    required bool isDark,
   }) {
     return _HoverButton(
       key: key,
@@ -406,17 +504,19 @@ class _HomeScreenState extends State<HomeScreen>
                 svgPath,
                 width: 24,
                 height: 24,
-                colorFilter: const ColorFilter.mode(
-                  Colors.black87,
+                colorFilter: ColorFilter.mode(
+                  Theme.of(context).colorScheme.onSurface,
                   BlendMode.srcIn,
                 ),
               )
-            : Icon(icon, size: 24, color: Colors.black87),
+            : Icon(icon, size: 24, color: Theme.of(context).iconTheme.color),
       ),
     );
   }
 
   Widget _buildFoldersGrid(List<FolderModel> folders) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return GridView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 24.0),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -475,6 +575,7 @@ class _HomeScreenState extends State<HomeScreen>
                           child: _buildSelectionCircle(
                             isSelected: isSelected,
                             size: 24,
+                            isDark: isDark,
                           ),
                         ),
                       ),
@@ -491,16 +592,21 @@ class _HomeScreenState extends State<HomeScreen>
   Widget _buildSelectionCircle({
     required bool isSelected,
     required double size,
+    required bool isDark,
   }) {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: isSelected ? AppColors.error : Colors.white,
+        color: isSelected
+            ? AppColors.error
+            : (isDark ? Theme.of(context).colorScheme.surface : Colors.white),
         shape: BoxShape.circle,
         border: Border.all(
-          color: isSelected ? AppColors.error : AppColors.grey300,
+          color: isSelected
+              ? AppColors.error
+              : (Theme.of(context).dividerTheme.color ?? Colors.grey),
           width: 2,
         ),
       ),
@@ -510,37 +616,77 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  Widget _buildSelectionBottomBar() {
+  Widget _buildSelectionBottomBar(bool isDark) {
     final canRename = _selectedFolderIds.length == 1;
 
     return Container(
       key: const ValueKey('selection_bottom_bar'),
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-      decoration: const BoxDecoration(color: Colors.white),
+      decoration: BoxDecoration(
+        color: isDark
+            ? Theme.of(context).scaffoldBackgroundColor
+            : Colors.white,
+      ),
       child: SafeArea(
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
             _buildBottomBarButton(
-              icon: Icons.close_rounded,
+              icon: SvgPicture.asset(
+                'assets/icons/close.svg',
+                width: 24,
+                height: 24,
+                colorFilter: ColorFilter.mode(
+                  Theme.of(context).colorScheme.onSurface,
+                  BlendMode.srcIn,
+                ),
+              ),
               label: 'Cancelar',
               onTap: _exitSelectionMode,
+              isDark: isDark,
             ),
             _buildBottomBarButton(
-              icon: Icons.palette_outlined,
+              icon: SvgPicture.asset(
+                'assets/icons/paintbucket.svg',
+                width: 24,
+                height: 24,
+                colorFilter: ColorFilter.mode(
+                  Theme.of(context).colorScheme.onSurface,
+                  BlendMode.srcIn,
+                ),
+              ),
               label: 'Color',
               onTap: _showColorPicker,
+              isDark: isDark,
             ),
             _buildBottomBarButton(
-              icon: Icons.edit_outlined,
+              icon: SvgPicture.asset(
+                'assets/icons/rename_name.svg',
+                width: 24,
+                height: 24,
+                colorFilter: ColorFilter.mode(
+                  Theme.of(context).colorScheme.onSurface,
+                  BlendMode.srcIn,
+                ),
+              ),
               label: 'Renombrar',
               onTap: canRename ? _showRenameDialog : null,
               isEnabled: canRename,
+              isDark: isDark,
             ),
             _buildBottomBarButton(
-              icon: Icons.delete_outline_rounded,
+              icon: SvgPicture.asset(
+                'assets/icons/delete.svg',
+                width: 24,
+                height: 24,
+                colorFilter: ColorFilter.mode(
+                  Theme.of(context).colorScheme.onSurface,
+                  BlendMode.srcIn,
+                ),
+              ),
               label: 'Eliminar',
               onTap: _showDeleteDialog,
+              isDark: isDark,
             ),
           ],
         ),
@@ -549,12 +695,18 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Widget _buildBottomBarButton({
-    required IconData icon,
+    required Widget icon,
     required String label,
     required VoidCallback? onTap,
+    required bool isDark,
     bool isEnabled = true,
   }) {
-    final color = isEnabled ? AppColors.textSecondary : AppColors.grey300;
+    final textStyle = Theme.of(context).textTheme.bodySmall?.copyWith(
+      fontWeight: FontWeight.w500,
+      color: isEnabled
+          ? null
+          : (isDark ? AppColors.textHintDark : AppColors.textHintLight),
+    );
 
     return _HoverButton(
       onTap: isEnabled ? onTap : null,
@@ -563,16 +715,9 @@ class _HomeScreenState extends State<HomeScreen>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 24, color: color),
+            icon,
             const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                color: color,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
+            Text(label, style: textStyle),
           ],
         ),
       ),
@@ -580,6 +725,8 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Widget _buildEmptyState(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -588,13 +735,21 @@ class _HomeScreenState extends State<HomeScreen>
             width: 100,
             height: 100,
             decoration: BoxDecoration(
-              color: AppColors.grey200,
+              color: isDark
+                  ? Theme.of(context).colorScheme.surface
+                  : const Color(0xFFF5F5F5),
               shape: BoxShape.circle,
             ),
-            child: Icon(
-              Icons.folder_outlined,
-              size: 50,
-              color: AppColors.textSecondary,
+            child: Center(
+              child: SvgPicture.asset(
+                'assets/icons/folder_empty.svg',
+                width: 50,
+                height: 50,
+                colorFilter: ColorFilter.mode(
+                  Theme.of(context).textTheme.bodyMedium?.color ?? Colors.grey,
+                  BlendMode.srcIn,
+                ),
+              ),
             ),
           ),
           const SizedBox(height: 20),
@@ -606,289 +761,25 @@ class _HomeScreenState extends State<HomeScreen>
           Text(
             'Toca el botón en el borde para crear\ntu primera carpeta',
             textAlign: TextAlign.center,
-            style: Theme.of(
-              context,
-            ).textTheme.bodyLarge?.copyWith(color: AppColors.textSecondary),
+            style: Theme.of(context).textTheme.bodyLarge,
           ),
         ],
       ),
     );
-  }
-
-  // ========== POPUP DE 3 PUNTOS (EDITAR Y ORDENAR) - MEJORADO ==========
-  void _showMoreOptionsPopup() {
-    // Obtener el RenderBox del botón
-    final RenderBox? button =
-        _moreButtonKey.currentContext?.findRenderObject() as RenderBox?;
-
-    if (button == null) {
-      debugPrint(
-        '❌ Error: No se pudo obtener el RenderBox del botón de 3 puntos',
-      );
-      return;
-    }
-
-    // Obtener el overlay
-    final RenderBox overlay =
-        Overlay.of(context).context.findRenderObject() as RenderBox;
-
-    // Calcular posición del botón en coordenadas globales
-    final Offset buttonPosition = button.localToGlobal(
-      Offset.zero,
-      ancestor: overlay,
-    );
-
-    const double menuWidth = 180;
-
-    // Calcular posición del popup
-    final RelativeRect position = RelativeRect.fromLTRB(
-      buttonPosition.dx + button.size.width - menuWidth,
-      buttonPosition.dy + button.size.height + 8,
-      MediaQuery.of(context).size.width -
-          (buttonPosition.dx + button.size.width),
-      MediaQuery.of(context).size.height -
-          (buttonPosition.dy + button.size.height + 8),
-    );
-
-    showMenu<String>(
-      context: context,
-      position: position,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      elevation: 8,
-      color: Colors.white,
-      items: [
-        PopupMenuItem<String>(
-          value: 'edit',
-          height: 56,
-          child: Row(
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(
-                  Icons.edit_rounded,
-                  color: AppColors.primary,
-                  size: 18,
-                ),
-              ),
-              const SizedBox(width: 12),
-              const Text(
-                'Editar',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black87,
-                ),
-              ),
-            ],
-          ),
-        ),
-        PopupMenuItem<String>(
-          value: 'sort',
-          height: 56,
-          child: Row(
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: AppColors.secondary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(
-                  Icons.sort_rounded,
-                  color: AppColors.secondary,
-                  size: 18,
-                ),
-              ),
-              const SizedBox(width: 12),
-              const Text(
-                'Ordenar',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black87,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    ).then((value) {
-      if (value == 'edit') {
-        setState(() {
-          _isSelectionMode = true;
-        });
-      } else if (value == 'sort') {
-        // IMPORTANTE: Dar tiempo para que el primer popup se cierre
-        Future.delayed(const Duration(milliseconds: 250), () {
-          if (mounted) {
-            _showSortOptionsPopup();
-          }
-        });
-      }
-    });
-  }
-
-  // ========== POPUP DE ORDENAR - MEJORADO ==========
-  void _showSortOptionsPopup() {
-    // Obtener el RenderBox del MISMO botón de 3 puntos
-    final RenderBox? button =
-        _moreButtonKey.currentContext?.findRenderObject() as RenderBox?;
-
-    if (button == null) {
-      debugPrint(
-        '❌ Error: No se pudo obtener el RenderBox para el popup de ordenar',
-      );
-      return;
-    }
-
-    // Obtener el overlay
-    final RenderBox overlay =
-        Overlay.of(context).context.findRenderObject() as RenderBox;
-
-    // Calcular posición del botón
-    final Offset buttonPosition = button.localToGlobal(
-      Offset.zero,
-      ancestor: overlay,
-    );
-
-    const double menuWidth = 220;
-
-    // Calcular posición del popup
-    final RelativeRect position = RelativeRect.fromLTRB(
-      buttonPosition.dx + button.size.width - menuWidth,
-      buttonPosition.dy + button.size.height + 8,
-      MediaQuery.of(context).size.width -
-          (buttonPosition.dx + button.size.width),
-      MediaQuery.of(context).size.height -
-          (buttonPosition.dy + button.size.height + 8),
-    );
-
-    showMenu<FolderSortOption>(
-      context: context,
-      position: position,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      elevation: 8,
-      color: Colors.white,
-      items: [
-        _buildSortPopupItem(
-          'Fecha (Más reciente)',
-          Icons.calendar_today_rounded,
-          FolderSortOption.dateDesc,
-        ),
-        _buildSortPopupItem(
-          'Fecha (Más antigua)',
-          Icons.history_rounded,
-          FolderSortOption.dateAsc,
-        ),
-        _buildSortPopupItem(
-          'Nombre (A-Z)',
-          Icons.sort_by_alpha_rounded,
-          FolderSortOption.nameAsc,
-        ),
-        _buildSortPopupItem(
-          'Nombre (Z-A)',
-          Icons.sort_by_alpha_rounded,
-          FolderSortOption.nameDesc,
-        ),
-        _buildSortPopupItem(
-          'Cantidad de libros',
-          Icons.menu_book_rounded,
-          FolderSortOption.bookCount,
-        ),
-      ],
-    ).then((value) {
-      if (value != null) {
-        setState(() {
-          _currentSortOption = value;
-        });
-      }
-    });
-  }
-
-  // ========== HELPER PARA ITEMS DEL POPUP DE ORDENAR ==========
-  PopupMenuItem<FolderSortOption> _buildSortPopupItem(
-    String title,
-    IconData icon,
-    FolderSortOption option,
-  ) {
-    final isSelected = _currentSortOption == option;
-
-    return PopupMenuItem<FolderSortOption>(
-      value: option,
-      height: 56,
-      child: Row(
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: isSelected
-                  ? AppColors.primary.withValues(alpha: 0.1)
-                  : AppColors.grey200,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(
-              icon,
-              color: isSelected ? AppColors.primary : AppColors.textSecondary,
-              size: 18,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              title,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                color: isSelected ? AppColors.primary : Colors.black87,
-              ),
-            ),
-          ),
-          if (isSelected)
-            const Icon(Icons.check_rounded, color: AppColors.primary, size: 20),
-        ],
-      ),
-    );
-  }
-
-  List<FolderModel> _getSortedFolders(List<FolderModel> folders) {
-    final sortedFolders = List<FolderModel>.from(folders);
-
-    switch (_currentSortOption) {
-      case FolderSortOption.dateDesc:
-        sortedFolders.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-        break;
-      case FolderSortOption.dateAsc:
-        sortedFolders.sort((a, b) => a.createdAt.compareTo(b.createdAt));
-        break;
-      case FolderSortOption.nameAsc:
-        sortedFolders.sort((a, b) => a.name.compareTo(b.name));
-        break;
-      case FolderSortOption.nameDesc:
-        sortedFolders.sort((a, b) => b.name.compareTo(a.name));
-        break;
-      case FolderSortOption.bookCount:
-        sortedFolders.sort((a, b) => b.bookCount.compareTo(a.bookCount));
-        break;
-    }
-
-    return sortedFolders;
   }
 
   Future<void> _showUploadDocumentFlow() async {
+    if (!mounted) return;
+    final folderProvider = context.read<FolderProvider>();
+    final allFolders = await folderProvider.getAllFoldersHierarchy();
+
     if (!mounted) return;
 
     final selectedFolder = await showModalBottomSheet<FolderModel>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => const SelectFolderWidget(),
+      builder: (context) => SelectFolderWidget(preloadedFolders: allFolders),
     );
 
     if (selectedFolder == null || !mounted) return;
@@ -919,22 +810,61 @@ class _HomeScreenState extends State<HomeScreen>
   Future<void> _navigateToCreateFolder() async {
     if (!mounted) return;
 
-    final result = await showModalBottomSheet(
+    await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => const CreateFolderWidget(),
     );
+  }
 
-    if (result == true && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Carpeta creada exitosamente'),
-          backgroundColor: AppColors.success,
-          behavior: SnackBarBehavior.floating,
+  void _navigateToSearch() {
+    Navigator.push(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) =>
+            const SearchBooksScreen(),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          const begin = Offset(1.0, 0.0);
+          const end = Offset.zero;
+          const curve = Curves.easeInOut;
+
+          var tween = Tween(
+            begin: begin,
+            end: end,
+          ).chain(CurveTween(curve: curve));
+
+          return SlideTransition(
+            position: animation.drive(tween),
+            child: child,
+          );
+        },
+        transitionDuration: const Duration(milliseconds: 300),
+      ),
+    );
+  }
+
+  Future<void> _navigateToCreateNote() async {
+    if (!mounted) return;
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
         ),
-      );
-    }
+        child: const NoteBottomSheet(),
+      ),
+    );
+  }
+
+  void _navigateToTaskGroups() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const TaskGroupsScreen()),
+    );
   }
 
   void _navigateToFolderDetail(FolderModel folder) {
@@ -980,6 +910,8 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   void _showColorPicker() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -987,7 +919,9 @@ class _HomeScreenState extends State<HomeScreen>
       builder: (bottomSheetContext) {
         return Container(
           decoration: BoxDecoration(
-            color: Colors.grey[50],
+            color: isDark
+                ? Theme.of(context).colorScheme.surface
+                : Colors.white,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           ),
           padding: const EdgeInsets.all(24),
@@ -999,19 +933,15 @@ class _HomeScreenState extends State<HomeScreen>
                   width: 36,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
+                    color: Theme.of(context).dividerTheme.color,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
               ),
               const SizedBox(height: 20),
-              const Text(
+              Text(
                 'Cambiar Color',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: -0.5,
-                ),
+                style: Theme.of(context).textTheme.titleLarge,
               ),
               const SizedBox(height: 24),
               Wrap(
@@ -1064,27 +994,18 @@ class _HomeScreenState extends State<HomeScreen>
         color: newColor,
         createdAt: folder.createdAt,
         bookCount: folder.bookCount,
+        parentFolderId: null,
       );
       await folderProvider.updateFolder(folderId, updatedFolder);
     }
 
     _exitSelectionMode();
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Color actualizado'),
-          backgroundColor: AppColors.success,
-          behavior: SnackBarBehavior.floating,
-          duration: Duration(seconds: 1),
-        ),
-      );
-    }
   }
 
   void _showRenameDialog() {
     if (_selectedFolderIds.length != 1) return;
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final folderId = _selectedFolderIds.first;
     final folderProvider = context.read<FolderProvider>();
     final folder = folderProvider.folders.firstWhere((f) => f.id == folderId);
@@ -1101,7 +1022,9 @@ class _HomeScreenState extends State<HomeScreen>
       builder: (bottomSheetContext) {
         return Container(
           decoration: BoxDecoration(
-            color: Colors.grey[50],
+            color: isDark
+                ? Theme.of(context).colorScheme.surface
+                : Colors.white,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           ),
           padding: EdgeInsets.only(
@@ -1120,35 +1043,29 @@ class _HomeScreenState extends State<HomeScreen>
                     width: 36,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade300,
+                      color: Theme.of(context).dividerTheme.color,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
                 ),
                 const SizedBox(height: 20),
-                const Text(
+                Text(
                   'Renombrar Carpeta',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.black87,
-                    letterSpacing: -0.5,
-                  ),
+                  style: Theme.of(context).textTheme.titleLarge,
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 24),
                 Container(
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: isDark
+                        ? Theme.of(context).scaffoldBackgroundColor
+                        : const Color(0xFFF5F5F5),
                     borderRadius: BorderRadius.circular(14),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color.fromARGB(
-                          255,
-                          100,
-                          100,
-                          100,
-                        ).withValues(alpha: 0.04),
+                        color: isDark
+                            ? Colors.black.withValues(alpha: 0.2)
+                            : Colors.black.withValues(alpha: 0.04),
                         blurRadius: 8,
                         offset: const Offset(0, 2),
                       ),
@@ -1157,24 +1074,33 @@ class _HomeScreenState extends State<HomeScreen>
                   child: TextFormField(
                     controller: nameController,
                     autofocus: true,
-                    style: const TextStyle(
-                      fontSize: 15,
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                       fontWeight: FontWeight.w500,
                       letterSpacing: -0.2,
                     ),
                     decoration: InputDecoration(
                       hintText: 'Nombre de la carpeta',
-                      hintStyle: TextStyle(
-                        color: Colors.grey[400],
-                        fontWeight: FontWeight.w400,
-                      ),
-                      prefixIcon: Icon(
-                        Icons.folder_rounded,
-                        color: Colors.grey[500],
-                        size: 20,
+                      hintStyle: Theme.of(context)
+                          .inputDecorationTheme
+                          .hintStyle
+                          ?.copyWith(fontWeight: FontWeight.w400),
+                      prefixIcon: Padding(
+                        padding: const EdgeInsets.all(12.0),
+                        child: SvgPicture.asset(
+                          'assets/icons/folder_icon.svg',
+                          width: 20,
+                          height: 20,
+                          colorFilter: ColorFilter.mode(
+                            Theme.of(context).textTheme.bodyMedium?.color ??
+                                Colors.grey,
+                            BlendMode.srcIn,
+                          ),
+                        ),
                       ),
                       filled: true,
-                      fillColor: Colors.white,
+                      fillColor: isDark
+                          ? Theme.of(context).scaffoldBackgroundColor
+                          : const Color(0xFFF5F5F5),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(14),
                         borderSide: BorderSide.none,
@@ -1199,10 +1125,16 @@ class _HomeScreenState extends State<HomeScreen>
                       child: Container(
                         height: 48,
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: isDark
+                              ? Theme.of(
+                                  context,
+                                ).colorScheme.surfaceContainerHighest
+                              : const Color(0xFFF5F5F5),
                           borderRadius: BorderRadius.circular(14),
                           border: Border.all(
-                            color: Colors.grey.shade300,
+                            color:
+                                Theme.of(context).dividerTheme.color ??
+                                Colors.grey,
                             width: 1.5,
                           ),
                         ),
@@ -1214,12 +1146,11 @@ class _HomeScreenState extends State<HomeScreen>
                             child: Center(
                               child: Text(
                                 'Cancelar',
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.grey[700],
-                                  letterSpacing: -0.3,
-                                ),
+                                style: Theme.of(context).textTheme.bodyLarge
+                                    ?.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                      letterSpacing: -0.3,
+                                    ),
                               ),
                             ),
                           ),
@@ -1234,13 +1165,17 @@ class _HomeScreenState extends State<HomeScreen>
                           borderRadius: BorderRadius.circular(14),
                           gradient: LinearGradient(
                             colors: [
-                              AppColors.primary,
-                              AppColors.primary.withValues(alpha: 0.85),
+                              Theme.of(context).colorScheme.primary,
+                              Theme.of(
+                                context,
+                              ).colorScheme.primary.withValues(alpha: 0.85),
                             ],
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: AppColors.primary.withValues(alpha: 0.3),
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.primary.withValues(alpha: 0.3),
                               blurRadius: 12,
                               offset: const Offset(0, 4),
                             ),
@@ -1259,6 +1194,7 @@ class _HomeScreenState extends State<HomeScreen>
                                   color: folder.color,
                                   createdAt: folder.createdAt,
                                   bookCount: folder.bookCount,
+                                  parentFolderId: folder.parentFolderId,
                                 );
 
                                 final success = await folderProvider
@@ -1272,24 +1208,18 @@ class _HomeScreenState extends State<HomeScreen>
 
                                 if (success) {
                                   _exitSelectionMode();
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Carpeta renombrada'),
-                                      backgroundColor: AppColors.success,
-                                      behavior: SnackBarBehavior.floating,
-                                      duration: Duration(seconds: 1),
-                                    ),
-                                  );
                                 }
                               }
                             },
-                            child: const Center(
+                            child: Center(
                               child: Text(
                                 'Guardar',
                                 style: TextStyle(
                                   fontSize: 15,
                                   fontWeight: FontWeight.w600,
-                                  color: Colors.white,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onPrimary,
                                   letterSpacing: -0.3,
                                 ),
                               ),
@@ -1313,30 +1243,30 @@ class _HomeScreenState extends State<HomeScreen>
 
   void _showDeleteDialog() {
     final count = _selectedFolderIds.length;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     showDialog(
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          backgroundColor: Colors.white,
+          backgroundColor: isDark
+              ? Theme.of(context).colorScheme.surface
+              : Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
           ),
-          title: const Text(
+          title: Text(
             'Eliminar Carpetas',
-            style: TextStyle(
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w700,
-              fontSize: 18,
               letterSpacing: -0.5,
             ),
           ),
           content: Text(
-            '¿Estás seguro de que deseas eliminar ${count == 1 ? 'esta carpeta' : 'estas $count carpetas'}?\n\nSe eliminarán todos los libros dentro de ${count == 1 ? 'ella' : 'ellas'}.',
-            style: TextStyle(
-              color: Colors.grey[700],
-              fontSize: 14,
-              height: 1.5,
-            ),
+            '¿Estás seguro de que deseas eliminar ${count == 1 ? 'esta carpeta' : 'estas $count carpetas'}?\n\nSe eliminarán todos los libros y subcarpetas dentro de ${count == 1 ? 'ella' : 'ellas'}.',
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(height: 1.5),
           ),
           actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
           actions: [
@@ -1344,17 +1274,18 @@ class _HomeScreenState extends State<HomeScreen>
               height: 44,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.shade300, width: 1.5),
+                border: Border.all(
+                  color: Theme.of(context).dividerTheme.color ?? Colors.grey,
+                  width: 1.5,
+                ),
               ),
               child: TextButton(
                 onPressed: () => Navigator.pop(dialogContext),
                 child: Text(
                   'Cancelar',
-                  style: TextStyle(
-                    color: Colors.grey[700],
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
                 ),
               ),
             ),
@@ -1399,26 +1330,12 @@ class _HomeScreenState extends State<HomeScreen>
     if (!mounted) return;
 
     final folderProvider = context.read<FolderProvider>();
-    final count = _selectedFolderIds.length;
 
     for (final folderId in _selectedFolderIds) {
       await folderProvider.deleteFolder(folderId);
     }
 
     _exitSelectionMode();
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            count == 1 ? 'Carpeta eliminada' : 'Carpetas eliminadas',
-          ),
-          backgroundColor: AppColors.success,
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 1),
-        ),
-      );
-    }
   }
 
   void _showUserPanel() {
@@ -1443,9 +1360,6 @@ class _HomeScreenState extends State<HomeScreen>
     return folders.fold(0, (sum, folder) => sum + folder.bookCount);
   }
 }
-
-// ========== ENUM PARA OPCIONES DE ORDENAMIENTO ==========
-enum FolderSortOption { dateDesc, dateAsc, nameAsc, nameDesc, bookCount }
 
 // ========== WIDGET PULSE BUTTON ==========
 class _PulseButton extends StatefulWidget {
@@ -1532,6 +1446,8 @@ class _HoverButtonState extends State<_HoverButton>
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return GestureDetector(
       onTapDown: widget.onTap != null
           ? (_) {
@@ -1555,7 +1471,11 @@ class _HoverButtonState extends State<_HoverButton>
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
         decoration: BoxDecoration(
-          color: _isPressed ? AppColors.grey200 : Colors.transparent,
+          color: _isPressed
+              ? (isDark
+                    ? Theme.of(context).colorScheme.surfaceContainerHighest
+                    : const Color(0xFFF5F5F5))
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
         ),
         child: ScaleTransition(scale: _scaleAnimation, child: widget.child),

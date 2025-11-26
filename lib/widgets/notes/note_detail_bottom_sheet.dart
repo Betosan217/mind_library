@@ -1,4 +1,4 @@
-// lib/widgets/note_detail_bottom_sheet.dart (REDISEÑADO - CON ICONOS SVG)
+// lib/widgets/note_detail_bottom_sheet.dart (ADAPTADO A TEMAS CLARO/OSCURO)
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -17,11 +17,16 @@ class NoteDetailBottomSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
     return Container(
       height: MediaQuery.of(context).size.height * 0.85,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      decoration: BoxDecoration(
+        // ✅ Blanco puro en tema claro
+        color: isDark ? colorScheme.surface : Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: Column(
         children: [
@@ -33,7 +38,7 @@ class NoteDetailBottomSheet extends StatelessWidget {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.grey[300],
+                  color: isDark ? AppColors.grey700 : AppColors.grey300,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -51,10 +56,9 @@ class NoteDetailBottomSheet extends StatelessWidget {
                     children: [
                       Text(
                         note.title,
-                        style: const TextStyle(
+                        style: theme.textTheme.titleLarge?.copyWith(
                           fontSize: 22,
                           fontWeight: FontWeight.w700,
-                          color: Colors.black87,
                           letterSpacing: -0.5,
                           height: 1.2,
                         ),
@@ -69,16 +73,16 @@ class NoteDetailBottomSheet extends StatelessWidget {
                             width: 14,
                             height: 14,
                             colorFilter: ColorFilter.mode(
-                              Colors.grey[400]!,
+                              isDark
+                                  ? AppColors.textHintDark
+                                  : AppColors.textHintLight,
                               BlendMode.srcIn,
                             ),
                           ),
                           const SizedBox(width: 4),
                           Text(
                             note.formattedDate,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey[500],
+                            style: theme.textTheme.bodySmall?.copyWith(
                               fontWeight: FontWeight.w500,
                             ),
                           ),
@@ -90,8 +94,9 @@ class NoteDetailBottomSheet extends StatelessWidget {
                 const SizedBox(width: 12),
                 // Botón editar
                 _buildActionButton(
+                  context: context,
                   icon: 'assets/icons/edit.svg',
-                  color: AppColors.primary,
+                  color: colorScheme.primary,
                   onTap: () => _editNote(context),
                 ),
                 const SizedBox(width: 8),
@@ -100,7 +105,9 @@ class NoteDetailBottomSheet extends StatelessWidget {
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: Colors.grey[100],
+                    color: isDark
+                        ? AppColors.surfaceVariantDark
+                        : AppColors.surfaceVariantLight,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Material(
@@ -111,7 +118,9 @@ class NoteDetailBottomSheet extends StatelessWidget {
                       child: Center(
                         child: Icon(
                           Icons.close_rounded,
-                          color: Colors.grey[600],
+                          color: isDark
+                              ? AppColors.textSecondaryDark
+                              : AppColors.textSecondaryLight,
                           size: 20,
                         ),
                       ),
@@ -123,7 +132,10 @@ class NoteDetailBottomSheet extends StatelessWidget {
           ),
 
           // Divider
-          Divider(height: 1, color: Colors.grey[200]),
+          Divider(
+            height: 1,
+            color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
+          ),
 
           // Contenido scrollable
           Expanded(
@@ -150,7 +162,7 @@ class NoteDetailBottomSheet extends StatelessWidget {
                             _buildCompactBadge(
                               icon: 'assets/icons/bookmark.svg',
                               label: 'Pág. ${note.pageNumber}',
-                              color: AppColors.primary,
+                              color: colorScheme.primary,
                             ),
                         ],
                       ),
@@ -161,15 +173,21 @@ class NoteDetailBottomSheet extends StatelessWidget {
                     width: double.infinity,
                     padding: const EdgeInsets.all(18),
                     decoration: BoxDecoration(
-                      color: Colors.grey[50],
+                      color: isDark
+                          ? AppColors.surfaceVariantDark
+                          : AppColors.surfaceVariantLight,
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.grey[200]!, width: 1),
+                      border: Border.all(
+                        color: isDark
+                            ? AppColors.dividerDark
+                            : AppColors.dividerLight,
+                        width: 1,
+                      ),
                     ),
                     child: SelectableText(
                       note.content,
-                      style: TextStyle(
+                      style: theme.textTheme.bodyMedium?.copyWith(
                         fontSize: 15,
-                        color: Colors.grey[800],
                         height: 1.6,
                         letterSpacing: -0.1,
                       ),
@@ -199,6 +217,7 @@ class NoteDetailBottomSheet extends StatelessWidget {
   }
 
   Widget _buildActionButton({
+    required BuildContext context,
     required String icon,
     required Color color,
     required VoidCallback onTap,
@@ -265,6 +284,10 @@ class NoteDetailBottomSheet extends StatelessWidget {
   }
 
   Widget _buildBookInfo(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
     return Consumer<BookProvider>(
       builder: (context, bookProvider, _) {
         final book = bookProvider.books.firstWhere(
@@ -283,9 +306,12 @@ class NoteDetailBottomSheet extends StatelessWidget {
           return Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: Colors.red[50],
+              color: AppColors.error.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: Colors.red[200]!, width: 1),
+              border: Border.all(
+                color: AppColors.error.withValues(alpha: 0.3),
+                width: 1,
+              ),
             ),
             child: Row(
               children: [
@@ -293,7 +319,7 @@ class NoteDetailBottomSheet extends StatelessWidget {
                   width: 36,
                   height: 36,
                   decoration: BoxDecoration(
-                    color: Colors.red[100],
+                    color: AppColors.error.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Center(
@@ -301,8 +327,8 @@ class NoteDetailBottomSheet extends StatelessWidget {
                       'assets/icons/error.svg',
                       width: 20,
                       height: 20,
-                      colorFilter: ColorFilter.mode(
-                        Colors.red[600]!,
+                      colorFilter: const ColorFilter.mode(
+                        AppColors.error,
                         BlendMode.srcIn,
                       ),
                     ),
@@ -312,9 +338,8 @@ class NoteDetailBottomSheet extends StatelessWidget {
                 Expanded(
                   child: Text(
                     'El libro vinculado ya no existe',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.red[700],
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: AppColors.error,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -327,12 +352,18 @@ class NoteDetailBottomSheet extends StatelessWidget {
         return Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: Colors.white,
+            // ✅ Blanco puro en tema claro
+            color: isDark ? colorScheme.surface : Colors.white,
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: Colors.grey[200]!, width: 1.5),
+            border: Border.all(
+              color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
+              width: 1.5,
+            ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
+                color: (isDark ? Colors.black : Colors.black).withValues(
+                  alpha: isDark ? 0.2 : 0.04,
+                ),
                 blurRadius: 8,
                 offset: const Offset(0, 2),
               ),
@@ -344,7 +375,7 @@ class NoteDetailBottomSheet extends StatelessWidget {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.1),
+                  color: colorScheme.primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Center(
@@ -352,8 +383,8 @@ class NoteDetailBottomSheet extends StatelessWidget {
                     'assets/icons/book.svg',
                     width: 22,
                     height: 22,
-                    colorFilter: const ColorFilter.mode(
-                      AppColors.primary,
+                    colorFilter: ColorFilter.mode(
+                      colorScheme.primary,
                       BlendMode.srcIn,
                     ),
                   ),
@@ -366,9 +397,7 @@ class NoteDetailBottomSheet extends StatelessWidget {
                   children: [
                     Text(
                       book.title,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[800],
+                      style: theme.textTheme.bodyMedium?.copyWith(
                         fontWeight: FontWeight.w600,
                         letterSpacing: -0.2,
                       ),
@@ -383,16 +412,16 @@ class NoteDetailBottomSheet extends StatelessWidget {
                           width: 12,
                           height: 12,
                           colorFilter: ColorFilter.mode(
-                            Colors.grey[400]!,
+                            isDark
+                                ? AppColors.textHintDark
+                                : AppColors.textHintLight,
                             BlendMode.srcIn,
                           ),
                         ),
                         const SizedBox(width: 4),
                         Text(
                           '${book.totalPages} páginas',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[500],
+                          style: theme.textTheme.bodySmall?.copyWith(
                             fontWeight: FontWeight.w500,
                           ),
                         ),
@@ -406,7 +435,7 @@ class NoteDetailBottomSheet extends StatelessWidget {
                 width: 16,
                 height: 16,
                 colorFilter: ColorFilter.mode(
-                  Colors.grey[400]!,
+                  isDark ? AppColors.textHintDark : AppColors.textHintLight,
                   BlendMode.srcIn,
                 ),
               ),
@@ -418,20 +447,22 @@ class NoteDetailBottomSheet extends StatelessWidget {
   }
 
   Widget _buildGoToPageButton(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Container(
       width: double.infinity,
       height: 50,
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            AppColors.primary,
-            AppColors.primary.withValues(alpha: 0.85),
+            colorScheme.primary,
+            colorScheme.primary.withValues(alpha: 0.85),
           ],
         ),
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.25),
+            color: colorScheme.primary.withValues(alpha: 0.25),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -449,18 +480,18 @@ class NoteDetailBottomSheet extends StatelessWidget {
                 'assets/icons/open_book.svg',
                 width: 20,
                 height: 20,
-                colorFilter: const ColorFilter.mode(
-                  Colors.white,
+                colorFilter: ColorFilter.mode(
+                  colorScheme.onPrimary,
                   BlendMode.srcIn,
                 ),
               ),
               const SizedBox(width: 10),
               Text(
                 'Ir a la página ${note.pageNumber}',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
-                  color: Colors.white,
+                  color: colorScheme.onPrimary,
                   letterSpacing: -0.2,
                 ),
               ),
@@ -497,13 +528,10 @@ class NoteDetailBottomSheet extends StatelessWidget {
 
     if (book.id.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Libro no encontrado'),
-          backgroundColor: Colors.red[400],
+        const SnackBar(
+          content: Text('Libro no encontrado'),
+          backgroundColor: AppColors.error,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
         ),
       );
       return;
@@ -523,17 +551,17 @@ class NoteDetailBottomSheet extends StatelessWidget {
   Color _getCategoryColor(String category) {
     switch (category) {
       case 'Resumen':
-        return const Color(0xFF64B5F6);
+        return AppColors.folderBlue;
       case 'Importante':
-        return const Color(0xFFEF5350);
+        return AppColors.folderRed;
       case 'Duda':
-        return const Color(0xFFFFB74D);
+        return AppColors.folderOrange;
       case 'Idea':
-        return const Color(0xFFBA68C8);
+        return AppColors.folderPurple;
       case 'Pendiente':
-        return const Color(0xFF81C784);
+        return AppColors.folderGreen;
       default:
-        return Colors.grey;
+        return AppColors.grey500;
     }
   }
 }

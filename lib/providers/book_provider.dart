@@ -11,100 +11,123 @@ class BookProvider with ChangeNotifier {
   final StorageService _storageService = StorageService();
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  List<BookModel> _books = [];
+  // 🆕 NUEVO: Libros globales (para HomeScreen - todos los libros del usuario)
+  List<BookModel> _allBooks = [];
+
+  // 🆕 NUEVO: Múltiples listas de libros por carpeta (para FolderDetailScreen)
+  final Map<String, List<BookModel>> _booksByFolderMap = {};
+
   bool _isLoading = false;
   bool _isUploading = false;
   double _uploadProgress = 0.0;
   String? _errorMessage;
   BookModel? _selectedBook;
 
-  // 🆕 Variable para saber qué stream está activo
-  String? _currentStreamType; // 'all' o 'folder'
-  String? _currentFolderId;
-
-  List<BookModel> get books => _books;
+  // Getters
+  List<BookModel> get books => _allBooks; // Para HomeScreen
   bool get isLoading => _isLoading;
   bool get isUploading => _isUploading;
   double get uploadProgress => _uploadProgress;
   String? get errorMessage => _errorMessage;
   BookModel? get selectedBook => _selectedBook;
 
-  // Stream de libros
-  StreamSubscription<List<BookModel>>? _booksSubscription;
+  // 🆕 Getter para libros de una carpeta específica
+  List<BookModel> getBooksForFolder(String folderId) {
+    return _booksByFolderMap[folderId] ?? [];
+  }
 
-  // Inicializar stream de TODOS los libros del usuario (para HomeScreen)
+  // Streams
+  StreamSubscription<List<BookModel>>? _allBooksSubscription;
+  final Map<String, StreamSubscription<List<BookModel>>>
+  _folderBooksSubscriptions = {};
+
+  // =====================================================
+  // STREAM DE TODOS LOS LIBROS (Solo para HomeScreen)
+  // =====================================================
   void initBooksStream(String userId) {
-    // Si ya estamos escuchando todos los libros, no hacer nada
-    if (_currentStreamType == 'all') {
+    // Si ya existe, no crear otro
+    if (_allBooksSubscription != null) {
+      debugPrint('⚠️ Stream de todos los libros ya activo');
       return;
     }
 
-    // 🔥 LIMPIAR LA LISTA INMEDIATAMENTE
-    _books = [];
-    _currentStreamType = 'all';
-    _currentFolderId = null;
-    notifyListeners();
+    debugPrint('🔵 Iniciando stream de TODOS los libros');
 
-    // Cancelar subscription anterior si existe
-    _booksSubscription?.cancel();
-
-    // Crear nuevo subscription que escucha cambios en tiempo real
-    _booksSubscription = _firestoreService
+    _allBooksSubscription = _firestoreService
         .getUserBooks(userId)
         .listen(
           (books) {
-            _books = books;
+            debugPrint('📦 Recibidos ${books.length} libros totales');
+            _allBooks = books;
             notifyListeners();
           },
           onError: (error) {
+            debugPrint('❌ Error en stream de libros: $error');
             _errorMessage = error.toString();
             notifyListeners();
           },
         );
   }
 
-  // Inicializar stream de libros de una carpeta específica (para FolderDetailScreen)
+  // =====================================================
+  // STREAM DE LIBROS DE CARPETA (Para FolderDetailScreen)
+  // =====================================================
   void initFolderBooksStream(String folderId) {
-    // Si ya estamos escuchando esta carpeta, no hacer nada
-    if (_currentStreamType == 'folder' && _currentFolderId == folderId) {
+    debugPrint('🔵 Iniciando stream de libros para carpeta: $folderId');
+
+    // Si ya existe un stream para esta carpeta, no crear otro
+    if (_folderBooksSubscriptions.containsKey(folderId)) {
+      debugPrint('⚠️ Stream ya existe para carpeta $folderId');
       return;
     }
 
-    // 🔥 LIMPIAR LA LISTA INMEDIATAMENTE
-    _books = [];
-    _currentStreamType = 'folder';
-    _currentFolderId = folderId;
-    notifyListeners();
-
-    // Cancelar el subscription anterior si existe
-    _booksSubscription?.cancel();
-
-    // Crear nuevo subscription
-    _booksSubscription = _firestoreService
+    // Crear nuevo stream para esta carpeta específica
+    _folderBooksSubscriptions[folderId] = _firestoreService
         .getFolderBooks(folderId)
         .listen(
           (books) {
-            _books = books;
+            debugPrint(
+              '📦 Recibidos ${books.length} libros para carpeta $folderId',
+            );
+            _booksByFolderMap[folderId] = books;
             notifyListeners();
           },
           onError: (error) {
+            debugPrint('❌ Error en stream de libros de carpeta: $error');
             _errorMessage = error.toString();
             notifyListeners();
           },
         );
   }
 
-  // Detener el stream (útil al cerrar sesión)
-  void stopBooksStream() {
-    _booksSubscription?.cancel();
-    _booksSubscription = null;
-    _books = [];
-    _currentStreamType = null;
-    _currentFolderId = null;
+  // =====================================================
+  // DETENER STREAM DE LIBROS DE CARPETA (Al salir de FolderDetail)
+  // =====================================================
+  void stopFolderBooksStream(String folderId) {
+    debugPrint('🔴 Deteniendo stream de libros para carpeta: $folderId');
+
+    _folderBooksSubscriptions[folderId]?.cancel();
+    _folderBooksSubscriptions.remove(folderId);
+    _booksByFolderMap.remove(folderId);
+
     notifyListeners();
   }
 
-  // Crear libro (con subida de PDF)
+  // =====================================================
+  // DETENER STREAM DE TODOS LOS LIBROS (Al cerrar sesión)
+  // =====================================================
+  void stopBooksStream() {
+    debugPrint('🔴 Deteniendo stream de todos los libros');
+    _allBooksSubscription?.cancel();
+    _allBooksSubscription = null;
+    _allBooks = [];
+    notifyListeners();
+  }
+
+  // =====================================================
+  // CRUD OPERATIONS
+  // =====================================================
+
   Future<bool> createBook({
     required String folderId,
     required String title,
@@ -177,7 +200,6 @@ class BookProvider with ChangeNotifier {
     }
   }
 
-  // Actualizar libro
   Future<bool> updateBook(String bookId, BookModel book) async {
     try {
       _isLoading = true;
@@ -197,7 +219,6 @@ class BookProvider with ChangeNotifier {
     }
   }
 
-  // Actualizar progreso de lectura
   Future<bool> updateReadingProgress({
     required String bookId,
     required int currentPage,
@@ -217,18 +238,14 @@ class BookProvider with ChangeNotifier {
     }
   }
 
-  // Eliminar libro
-  Future<bool> deleteBook(String bookId, String folderId, String pdfUrl) async {
+  Future<bool> deleteBook(String bookId, String folderId) async {
     try {
       _isLoading = true;
       _errorMessage = null;
       notifyListeners();
 
-      // Eliminar PDF de Storage
-      await _storageService.deleteFile(pdfUrl);
-
-      // Eliminar de Firestore
       await _firestoreService.deleteBook(bookId, folderId);
+
       _isLoading = false;
       notifyListeners();
       return true;
@@ -240,19 +257,16 @@ class BookProvider with ChangeNotifier {
     }
   }
 
-  // Seleccionar libro
   void selectBook(BookModel book) {
     _selectedBook = book;
     notifyListeners();
   }
 
-  // Limpiar selección
   void clearSelection() {
     _selectedBook = null;
     notifyListeners();
   }
 
-  // Buscar libros
   Future<List<BookModel>> searchBooks(String query) async {
     try {
       final userId = _auth.currentUser?.uid;
@@ -266,7 +280,6 @@ class BookProvider with ChangeNotifier {
     }
   }
 
-  // Obtener estadísticas
   Future<Map<String, dynamic>> getUserStats() async {
     try {
       final userId = _auth.currentUser?.uid;
@@ -280,14 +293,12 @@ class BookProvider with ChangeNotifier {
     }
   }
 
-  // Filtrar libros por estado
   List<BookModel> getBooksByStatus(ReadingStatus status) {
-    return _books.where((book) => book.status == status).toList();
+    return _allBooks.where((book) => book.status == status).toList();
   }
 
-  // Obtener libros recientes
   List<BookModel> get recentBooks {
-    List<BookModel> sortedBooks = List.from(_books);
+    List<BookModel> sortedBooks = List.from(_allBooks);
     sortedBooks.sort((a, b) {
       if (b.lastReadAt == null) return -1;
       if (a.lastReadAt == null) return 1;
@@ -296,7 +307,6 @@ class BookProvider with ChangeNotifier {
     return sortedBooks.take(5).toList();
   }
 
-  // Limpiar error
   void clearError() {
     _errorMessage = null;
     notifyListeners();
@@ -304,7 +314,10 @@ class BookProvider with ChangeNotifier {
 
   @override
   void dispose() {
-    _booksSubscription?.cancel();
+    _allBooksSubscription?.cancel();
+    _folderBooksSubscriptions.forEach((_, sub) => sub.cancel());
+    _folderBooksSubscriptions.clear();
+    _booksByFolderMap.clear();
     super.dispose();
   }
 }

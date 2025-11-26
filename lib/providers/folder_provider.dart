@@ -3,87 +3,177 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:async';
 import '../models/folder_model.dart';
 import '../services/firestore_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class FolderProvider with ChangeNotifier {
   final FirestoreService _firestoreService = FirestoreService();
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
+  // Carpetas raíz (para HomeScreen)
   List<FolderModel> _folders = [];
+
+  // 🆕 NUEVO: Múltiples listas de subcarpetas por parentId
+  final Map<String, List<FolderModel>> _subFoldersMap = {};
+
   bool _isLoading = false;
   String? _errorMessage;
   FolderModel? _selectedFolder;
 
+  // Getters
   List<FolderModel> get folders => _folders;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   FolderModel? get selectedFolder => _selectedFolder;
 
-  // Stream de carpetas del usuario
-  StreamSubscription<List<FolderModel>>? _foldersSubscription;
-  bool _isStreamActive = false;
+  // 🆕 Getter para subcarpetas de un padre específico
+  List<FolderModel> getSubFolders(String parentId) {
+    return _subFoldersMap[parentId] ?? [];
+  }
 
-  // ✅ CORREGIDO: Inicializar stream con el userId directamente
+  // Streams
+  StreamSubscription<List<FolderModel>>? _rootFoldersSubscription;
+  final Map<String, StreamSubscription<List<FolderModel>>>
+  _subFolderSubscriptions = {};
+
+  // =====================================================
+  // STREAM DE CARPETAS RAÍZ (Solo para HomeScreen)
+  // =====================================================
   void initFoldersStream() {
-    // Prevenir múltiples inicializaciones
-    if (_isStreamActive) {
-      debugPrint('⚠️ Stream ya está activo, ignorando...');
-      return;
-    }
-
     final userId = _auth.currentUser?.uid;
     if (userId == null) {
-      debugPrint('❌ Error: Usuario no autenticado al iniciar stream');
+      debugPrint('❌ Error: Usuario no autenticado');
       return;
     }
 
-    debugPrint('🔵 Iniciando stream de carpetas para usuario: $userId');
+    // Si ya existe, no crear otro
+    if (_rootFoldersSubscription != null) {
+      debugPrint('⚠️ Stream de carpetas raíz ya activo');
+      return;
+    }
 
-    // Cancelar subscription anterior si existe
-    _foldersSubscription?.cancel();
+    debugPrint('🔵 Iniciando stream de carpetas RAÍZ');
 
-    // Marcar como activo
-    _isStreamActive = true;
-
-    // Crear nuevo subscription que escucha cambios en tiempo real
-    _foldersSubscription = _firestoreService
+    _rootFoldersSubscription = _firestoreService
         .getUserFolders(userId)
         .listen(
           (folders) {
-            debugPrint('📦 Stream recibió ${folders.length} carpetas');
+            debugPrint('📦 Recibidas ${folders.length} carpetas raíz');
             _folders = folders;
             notifyListeners();
           },
           onError: (error) {
-            debugPrint('❌ Error en stream: $error');
+            debugPrint('❌ Error en stream raíz: $error');
             _errorMessage = error.toString();
-            _isStreamActive = false;
             notifyListeners();
-          },
-          onDone: () {
-            debugPrint('✅ Stream completado');
-            _isStreamActive = false;
           },
         );
   }
 
-  // Detener el stream (útil al cerrar sesión)
+  // =====================================================
+  // STREAM DE SUBCARPETAS (Para FolderDetailScreen)
+  // =====================================================
+  void initSubFoldersStream(String parentFolderId) {
+    debugPrint('🔵 Iniciando stream de subcarpetas para: $parentFolderId');
+
+    // Si ya existe un stream para este padre, no crear otro
+    if (_subFolderSubscriptions.containsKey(parentFolderId)) {
+      debugPrint('⚠️ Stream ya existe para $parentFolderId');
+      return;
+    }
+
+    // Crear nuevo stream para este padre específico
+    _subFolderSubscriptions[parentFolderId] = _firestoreService
+        .getSubFolders(parentFolderId)
+        .listen(
+          (subFolders) {
+            debugPrint(
+              '📦 Recibidas ${subFolders.length} subcarpetas para $parentFolderId',
+            );
+            _subFoldersMap[parentFolderId] = subFolders;
+            notifyListeners();
+          },
+          onError: (error) {
+            debugPrint('❌ Error en stream de subcarpetas: $error');
+            _errorMessage = error.toString();
+            notifyListeners();
+          },
+        );
+  }
+
+  // =====================================================
+  // DETENER STREAM DE SUBCARPETAS (Al salir de FolderDetail)
+  // =====================================================
+  void stopSubFoldersStream(String parentFolderId) {
+    debugPrint('🔴 Deteniendo stream de subcarpetas: $parentFolderId');
+
+    _subFolderSubscriptions[parentFolderId]?.cancel();
+    _subFolderSubscriptions.remove(parentFolderId);
+    _subFoldersMap.remove(parentFolderId);
+
+    notifyListeners();
+  }
+
+  // =====================================================
+  // DETENER STREAM RAÍZ (Al cerrar sesión)
+  // =====================================================
   void stopFoldersStream() {
-    debugPrint('🔴 Deteniendo stream de carpetas');
-    _foldersSubscription?.cancel();
-    _foldersSubscription = null;
+    debugPrint('🔴 Deteniendo stream de carpetas raíz');
+    _rootFoldersSubscription?.cancel();
+    _rootFoldersSubscription = null;
     _folders = [];
-    _isStreamActive = false;
     notifyListeners();
   }
 
   @override
   void dispose() {
     debugPrint('🗑️ Disposing FolderProvider');
-    _foldersSubscription?.cancel();
+    _rootFoldersSubscription?.cancel();
+    _subFolderSubscriptions.forEach((_, sub) => sub.cancel());
+    _subFolderSubscriptions.clear();
+    _subFoldersMap.clear();
     super.dispose();
   }
 
-  // Crear carpeta
+  Future<List<FolderModel>> getAllFoldersHierarchy() async {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) {
+      debugPrint('❌ Usuario no autenticado');
+      return [];
+    }
+
+    try {
+      debugPrint('📂 Cargando jerarquía completa de carpetas...');
+
+      // Obtener TODAS las carpetas del usuario en un solo snapshot
+      final snapshot = await FirebaseFirestore.instance
+          .collection('folders')
+          .where('userId', isEqualTo: userId)
+          .get();
+
+      final allFolders = snapshot.docs
+          .map((doc) => FolderModel.fromFirestore(doc))
+          .toList();
+
+      // ✅ QUITAR ESTAS LÍNEAS (no actualizar _folders ni notificar)
+      // _folders = allFolders;
+      // notifyListeners();
+
+      debugPrint(
+        '✅ Cargadas ${allFolders.length} carpetas en total (raíz + todas las subcarpetas)',
+      );
+
+      // ✅ SOLO retornar, sin afectar el estado del provider
+      return allFolders;
+    } catch (e) {
+      debugPrint('❌ Error cargando jerarquía: $e');
+      _errorMessage = e.toString();
+      return [];
+    }
+  }
+  // =====================================================
+  // CRUD OPERATIONS
+  // =====================================================
+
   Future<bool> createFolder(FolderModel folder) async {
     try {
       _isLoading = true;
@@ -106,7 +196,6 @@ class FolderProvider with ChangeNotifier {
     }
   }
 
-  // Actualizar carpeta
   Future<bool> updateFolder(String folderId, FolderModel folder) async {
     try {
       _isLoading = true;
@@ -126,7 +215,6 @@ class FolderProvider with ChangeNotifier {
     }
   }
 
-  // Eliminar carpeta
   Future<bool> deleteFolder(String folderId) async {
     try {
       _isLoading = true;
@@ -146,19 +234,16 @@ class FolderProvider with ChangeNotifier {
     }
   }
 
-  // Seleccionar carpeta
   void selectFolder(FolderModel folder) {
     _selectedFolder = folder;
     notifyListeners();
   }
 
-  // Limpiar selección
   void clearSelection() {
     _selectedFolder = null;
     notifyListeners();
   }
 
-  // Obtener carpeta por ID
   Future<FolderModel?> getFolderById(String folderId) async {
     try {
       return await _firestoreService.getFolderById(folderId);
@@ -169,17 +254,14 @@ class FolderProvider with ChangeNotifier {
     }
   }
 
-  // Limpiar error
   void clearError() {
     _errorMessage = null;
     notifyListeners();
   }
 
-  // Obtener cantidad de carpetas
   int get foldersCount => _folders.length;
 
-  // Obtener total de libros en todas las carpetas
   int get totalBooks {
-    return _folders.fold(0, (sum, folder) => sum + folder.bookCount);
+    return _folders.fold(0, (int sum, folder) => sum + folder.bookCount);
   }
 }

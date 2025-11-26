@@ -1,5 +1,8 @@
+// ============================================================
+// custom_button.dart (ADAPTADO A TEMAS CLARO/OSCURO)
+// ============================================================
+
 import 'package:flutter/material.dart';
-import '../../utils/app_colors.dart';
 
 class CustomButton extends StatelessWidget {
   final String text;
@@ -25,14 +28,17 @@ class CustomButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return SizedBox(
       width: width ?? double.infinity,
       height: height,
       child: ElevatedButton(
         onPressed: isLoading ? null : onPressed,
         style: ElevatedButton.styleFrom(
-          backgroundColor: backgroundColor ?? AppColors.primary,
-          foregroundColor: textColor ?? Colors.white,
+          backgroundColor: backgroundColor ?? colorScheme.primary,
+          foregroundColor: textColor ?? colorScheme.onPrimary,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
@@ -40,12 +46,14 @@ class CustomButton extends StatelessWidget {
           shadowColor: Colors.transparent,
         ),
         child: isLoading
-            ? const SizedBox(
+            ? SizedBox(
                 width: 24,
                 height: 24,
                 child: CircularProgressIndicator(
                   strokeWidth: 2.5,
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    textColor ?? colorScheme.onPrimary,
+                  ),
                 ),
               )
             : Row(

@@ -6,7 +6,10 @@ import '../../models/folder_model.dart';
 import '../../utils/app_colors.dart';
 
 class CreateFolderWidget extends StatefulWidget {
-  const CreateFolderWidget({super.key});
+  final String?
+  parentFolderId; // ✅ NUEVO: null = carpeta raíz, con valor = subcarpeta
+
+  const CreateFolderWidget({super.key, this.parentFolderId});
 
   @override
   State<CreateFolderWidget> createState() => _CreateFolderWidgetState();
@@ -63,6 +66,7 @@ class _CreateFolderWidgetState extends State<CreateFolderWidget>
         color: _selectedColor,
         createdAt: DateTime.now(),
         bookCount: 0,
+        parentFolderId: widget.parentFolderId, // ✅ NUEVO: Asignar parentId
       );
 
       bool success = await folderProvider.createFolder(folder);
@@ -71,31 +75,23 @@ class _CreateFolderWidgetState extends State<CreateFolderWidget>
 
       if (success) {
         Navigator.pop(context, true);
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              folderProvider.errorMessage ?? 'Error al crear carpeta',
-            ),
-            backgroundColor: AppColors.error,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            margin: const EdgeInsets.all(16),
-          ),
-        );
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    // ✅ NUEVO: Detectar si estamos creando una subcarpeta
+    final isSubfolder = widget.parentFolderId != null;
+
     return Consumer<FolderProvider>(
       builder: (context, folderProvider, child) {
         return Container(
           decoration: BoxDecoration(
-            color: Colors.grey[50],
+            color: isDark
+                ? Theme.of(context).colorScheme.surface
+                : Colors.white,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           ),
           padding: EdgeInsets.only(
@@ -117,22 +113,17 @@ class _CreateFolderWidgetState extends State<CreateFolderWidget>
                         width: 36,
                         height: 4,
                         decoration: BoxDecoration(
-                          color: Colors.grey.shade300,
+                          color: isDark ? AppColors.grey700 : AppColors.grey300,
                           borderRadius: BorderRadius.circular(2),
                         ),
                       ),
                     ),
                     const SizedBox(height: 20),
 
-                    // Título
+                    // ✅ MODIFICADO: Título dinámico
                     Text(
-                      'Nueva Carpeta',
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.black87,
-                        letterSpacing: -0.5,
-                      ),
+                      isSubfolder ? 'Nueva Subcarpeta' : 'Nueva Carpeta',
+                      style: Theme.of(context).textTheme.titleLarge,
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 20),
@@ -154,11 +145,15 @@ class _CreateFolderWidgetState extends State<CreateFolderWidget>
                     // Campo de nombre
                     Container(
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: isDark
+                            ? Theme.of(context).colorScheme.surface
+                            : const Color(0xFFF5F5F5),
                         borderRadius: BorderRadius.circular(14),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.04),
+                            color: isDark
+                                ? Colors.black.withValues(alpha: 0.2)
+                                : Colors.black.withValues(alpha: 0.04),
                             blurRadius: 8,
                             offset: const Offset(0, 2),
                           ),
@@ -169,24 +164,31 @@ class _CreateFolderWidgetState extends State<CreateFolderWidget>
                         onChanged: (value) {
                           setState(() {});
                         },
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w500,
                           letterSpacing: -0.2,
+                          color: Theme.of(context).colorScheme.onSurface,
                         ),
                         decoration: InputDecoration(
                           hintText: 'Nombre de la carpeta',
                           hintStyle: TextStyle(
-                            color: Colors.grey[400],
+                            color: isDark
+                                ? AppColors.textHintDark
+                                : AppColors.textHintLight,
                             fontWeight: FontWeight.w400,
                           ),
                           prefixIcon: Icon(
                             Icons.folder_rounded,
-                            color: Colors.grey[500],
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withValues(alpha: 0.6),
                             size: 20,
                           ),
                           filled: true,
-                          fillColor: Colors.white,
+                          fillColor: isDark
+                              ? Theme.of(context).colorScheme.surface
+                              : const Color(0xFFF5F5F5),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(14),
                             borderSide: BorderSide.none,
@@ -212,16 +214,18 @@ class _CreateFolderWidgetState extends State<CreateFolderWidget>
                         Icon(
                           Icons.palette_rounded,
                           size: 18,
-                          color: Colors.grey[600],
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withValues(alpha: 0.7),
                         ),
                         const SizedBox(width: 8),
                         Text(
                           'Color',
                           style: TextStyle(
-                            fontSize: 13,
+                            fontSize: 12,
                             fontWeight: FontWeight.w600,
-                            color: Colors.grey[700],
                             letterSpacing: -0.2,
+                            color: Theme.of(context).colorScheme.onSurface,
                           ),
                         ),
                       ],
@@ -261,16 +265,20 @@ class _CreateFolderWidgetState extends State<CreateFolderWidget>
                                     ]
                                   : [
                                       BoxShadow(
-                                        color: Colors.black.withValues(
-                                          alpha: 0.08,
-                                        ),
+                                        color: isDark
+                                            ? Colors.black.withValues(
+                                                alpha: 0.3,
+                                              )
+                                            : Colors.black.withValues(
+                                                alpha: 0.06,
+                                              ),
                                         blurRadius: 4,
                                         offset: const Offset(0, 1),
                                       ),
                                     ],
                             ),
                             child: isSelected
-                                ? Icon(
+                                ? const Icon(
                                     Icons.check_rounded,
                                     color: Colors.white,
                                     size: 20,
@@ -290,10 +298,16 @@ class _CreateFolderWidgetState extends State<CreateFolderWidget>
                           child: Container(
                             height: 48,
                             decoration: BoxDecoration(
-                              color: Colors.white,
+                              color: isDark
+                                  ? Theme.of(
+                                      context,
+                                    ).colorScheme.surfaceContainerHighest
+                                  : const Color(0xFFF5F5F5),
                               borderRadius: BorderRadius.circular(14),
                               border: Border.all(
-                                color: Colors.grey.shade300,
+                                color: isDark
+                                    ? AppColors.dividerDark
+                                    : AppColors.dividerLight,
                                 width: 1.5,
                               ),
                             ),
@@ -308,8 +322,11 @@ class _CreateFolderWidgetState extends State<CreateFolderWidget>
                                     style: TextStyle(
                                       fontSize: 15,
                                       fontWeight: FontWeight.w600,
-                                      color: Colors.grey[700],
                                       letterSpacing: -0.3,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurface
+                                          .withValues(alpha: 0.7),
                                     ),
                                   ),
                                 ),
@@ -327,8 +344,12 @@ class _CreateFolderWidgetState extends State<CreateFolderWidget>
                               gradient: LinearGradient(
                                 colors: folderProvider.isLoading
                                     ? [
-                                        Colors.grey.shade300,
-                                        Colors.grey.shade400,
+                                        isDark
+                                            ? AppColors.grey700
+                                            : AppColors.grey300,
+                                        isDark
+                                            ? AppColors.grey800
+                                            : AppColors.grey400,
                                       ]
                                     : [
                                         _selectedColor,
@@ -367,9 +388,9 @@ class _CreateFolderWidgetState extends State<CreateFolderWidget>
                                                 ),
                                           ),
                                         )
-                                      : Text(
+                                      : const Text(
                                           'Añadir',
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             fontSize: 15,
                                             fontWeight: FontWeight.w600,
                                             color: Colors.white,
@@ -396,7 +417,7 @@ class _CreateFolderWidgetState extends State<CreateFolderWidget>
   }
 }
 
-// ============= PREVIEW (DISEÑO ORIGINAL SIN CAMBIOS) =============
+// ============= PREVIEW (ADAPTADO A TEMAS) =============
 class _PreviewStackedFolder extends StatelessWidget {
   final String name;
   final Color color;
@@ -405,6 +426,7 @@ class _PreviewStackedFolder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     const double containerWidth = 130;
     const double containerHeight = 90;
     const double cardHeight = 50;
@@ -427,11 +449,13 @@ class _PreviewStackedFolder extends StatelessWidget {
       width: containerWidth,
       height: containerHeight,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF2C2C2E) : Colors.white,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
+            color: isDark
+                ? Colors.black.withValues(alpha: 0.4)
+                : Colors.black.withValues(alpha: 0.08),
             blurRadius: 10,
             offset: const Offset(0, 3),
           ),
@@ -494,7 +518,7 @@ class _PreviewStackedFolder extends StatelessWidget {
             child: Container(
               height: cardHeight,
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: isDark ? const Color(0xFF2C2C2E) : Colors.white,
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Column(
@@ -504,7 +528,9 @@ class _PreviewStackedFolder extends StatelessWidget {
                     width: 24,
                     height: 2,
                     decoration: BoxDecoration(
-                      color: Colors.grey[300],
+                      color: isDark
+                          ? AppColors.dividerDark
+                          : AppColors.dividerLight,
                       borderRadius: BorderRadius.circular(1),
                     ),
                   ),
@@ -520,10 +546,10 @@ class _PreviewStackedFolder extends StatelessWidget {
                         children: [
                           Text(
                             name,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
-                              color: Colors.black87,
+                              color: Theme.of(context).colorScheme.onSurface,
                               height: 1.2,
                             ),
                             maxLines: 2,
@@ -534,7 +560,9 @@ class _PreviewStackedFolder extends StatelessWidget {
                             '0 libros',
                             style: TextStyle(
                               fontSize: 9,
-                              color: Colors.grey[500],
+                              color: isDark
+                                  ? AppColors.textTertiaryDark
+                                  : AppColors.textTertiaryLight,
                             ),
                           ),
                         ],

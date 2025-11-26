@@ -3,6 +3,8 @@ import '../models/folder_model.dart';
 import '../models/book_model.dart';
 import '../models/note_model.dart';
 import 'storage_service.dart';
+import '../models/task_model.dart';
+import '../models/task_group_model.dart';
 
 class FirestoreService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -10,13 +12,10 @@ class FirestoreService {
 
   // ==================== FOLDERS ====================
 
-  // ✅ SOLUCIÓN DEFINITIVA - Solo campos de FolderModel
   Future<String> createFolder(FolderModel folder) async {
     try {
-      // 1. Generar ID primero
       DocumentReference docRef = _firestore.collection('folders').doc();
 
-      // 2. Crear el map exactamente con los campos de tu modelo
       final now = DateTime.now();
       final folderData = {
         'userId': folder.userId,
@@ -25,10 +24,11 @@ class FirestoreService {
         'colorValue': folder.color.value,
         'createdAt': Timestamp.fromDate(now),
         'updatedAt': Timestamp.fromDate(now),
-        'bookCount': 0, // Siempre inicia en 0
+        'bookCount': 0,
+        'parentId':
+            folder.parentFolderId, // 👈 CORRECCIÓN: Guardar como "parentId"
       };
 
-      // 3. Guardar en Firestore
       await docRef.set(folderData);
 
       return docRef.id;
@@ -37,15 +37,17 @@ class FirestoreService {
     }
   }
 
-  // Obtener carpetas del usuario
+  // 👇 MODIFICADO - Obtener SOLO carpetas raíz (sin padre)
   Stream<List<FolderModel>> getUserFolders(String userId) {
     return _firestore
         .collection('folders')
         .where('userId', isEqualTo: userId)
-        // ⚠️ Quitamos orderBy temporalmente hasta crear el índice
+        .where(
+          'parentId',
+          isNull: true,
+        ) // 👈 CORRECCIÓN: Filtrar por "parentId"
         .snapshots()
         .map((snapshot) {
-          // Ordenamos en el código en lugar de en la consulta
           var folders = snapshot.docs
               .map((doc) => FolderModel.fromFirestore(doc))
               .toList();
@@ -55,7 +57,41 @@ class FirestoreService {
         });
   }
 
-  // Obtener una carpeta por ID
+  // 👇 NUEVO - Obtener subcarpetas de una carpeta específica
+  Stream<List<FolderModel>> getSubFolders(String parentFolderId) {
+    return _firestore
+        .collection('folders')
+        .where(
+          'parentId',
+          isEqualTo: parentFolderId,
+        ) // 👈 CORRECCIÓN: Filtrar por "parentId"
+        .snapshots()
+        .map((snapshot) {
+          var folders = snapshot.docs
+              .map((doc) => FolderModel.fromFirestore(doc))
+              .toList();
+
+          folders.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          return folders;
+        });
+  }
+
+  // 👇 NUEVO - Obtener todas las carpetas (para migraciones o búsquedas)
+  Stream<List<FolderModel>> getAllUserFolders(String userId) {
+    return _firestore
+        .collection('folders')
+        .where('userId', isEqualTo: userId)
+        .snapshots()
+        .map((snapshot) {
+          var folders = snapshot.docs
+              .map((doc) => FolderModel.fromFirestore(doc))
+              .toList();
+
+          folders.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          return folders;
+        });
+  }
+
   Future<FolderModel?> getFolderById(String folderId) async {
     try {
       DocumentSnapshot doc = await _firestore
@@ -71,7 +107,6 @@ class FirestoreService {
     }
   }
 
-  // Actualizar carpeta
   Future<void> updateFolder(String folderId, FolderModel folder) async {
     try {
       await _firestore
@@ -83,49 +118,63 @@ class FirestoreService {
     }
   }
 
-  // Eliminar carpeta
+  // 👇 MODIFICADO - Eliminar carpeta y todas sus subcarpetas recursivamente
   Future<void> deleteFolder(String folderId) async {
     try {
+      // 1. Obtener todas las subcarpetas
+      QuerySnapshot subFolders = await _firestore
+          .collection('folders')
+          .where('parentFolderId', isEqualTo: folderId)
+          .get();
+
+      // 2. Eliminar subcarpetas recursivamente
+      for (var subFolderDoc in subFolders.docs) {
+        await deleteFolder(subFolderDoc.id);
+      }
+
+      // 3. Obtener todos los libros de esta carpeta
       QuerySnapshot books = await _firestore
           .collection('books')
           .where('folderId', isEqualTo: folderId)
           .get();
 
-      for (var doc in books.docs) {
-        BookModel book = BookModel.fromFirestore(doc);
-
-        if (book.pdfUrl.isNotEmpty) {
-          try {
-            await _storageService.deleteFile(book.pdfUrl);
-          } catch (e) {
-            // Continuar aunque falle
-          }
-        }
-
-        if (book.coverUrl != null && book.coverUrl!.isNotEmpty) {
-          try {
-            await _storageService.deleteFile(book.coverUrl!);
-          } catch (e) {
-            // Continuar aunque falle
-          }
-        }
-      }
-
       WriteBatch batch = _firestore.batch();
 
+      // 4. Eliminar todos los libros
       for (var doc in books.docs) {
         batch.delete(doc.reference);
       }
 
+      // 5. Eliminar la carpeta
       batch.delete(_firestore.collection('folders').doc(folderId));
 
       await batch.commit();
+
+      // 6. Eliminar archivos de Storage
+      _deleteFolderFiles(books.docs);
     } catch (e) {
       throw Exception('Error al eliminar carpeta: $e');
     }
   }
 
-  // Incrementar contador de libros
+  Future<void> _deleteFolderFiles(List<QueryDocumentSnapshot> bookDocs) async {
+    for (var doc in bookDocs) {
+      try {
+        BookModel book = BookModel.fromFirestore(doc);
+
+        if (book.pdfUrl.isNotEmpty) {
+          await _storageService.deleteFile(book.pdfUrl);
+        }
+
+        if (book.coverUrl != null && book.coverUrl!.isNotEmpty) {
+          await _storageService.deleteFile(book.coverUrl!);
+        }
+      } catch (e) {
+        // Continuar con los demás archivos
+      }
+    }
+  }
+
   Future<void> incrementFolderBookCount(String folderId, int increment) async {
     try {
       await _firestore.collection('folders').doc(folderId).update({
@@ -137,7 +186,6 @@ class FirestoreService {
     }
   }
 
-  // Actualizar contador de libros
   Future<void> updateFolderBookCount(String folderId) async {
     try {
       QuerySnapshot books = await _firestore
@@ -158,15 +206,12 @@ class FirestoreService {
 
   // ==================== BOOKS ====================
 
-  // ✅ CORREGIDO para libros también
   Future<String> createBook(BookModel book) async {
     try {
       WriteBatch batch = _firestore.batch();
 
-      // 1. Generar ID del libro
       DocumentReference bookRef = _firestore.collection('books').doc();
 
-      // 2. Crear map del libro con timestamp real
       final now = DateTime.now();
       final bookData = {
         'userId': book.userId,
@@ -185,7 +230,6 @@ class FirestoreService {
 
       batch.set(bookRef, bookData);
 
-      // 3. Incrementar contador de la carpeta
       DocumentReference folderRef = _firestore
           .collection('folders')
           .doc(book.folderId);
@@ -202,7 +246,6 @@ class FirestoreService {
     }
   }
 
-  // Obtener libros de una carpeta
   Stream<List<BookModel>> getFolderBooks(String folderId) {
     return _firestore
         .collection('books')
@@ -218,7 +261,6 @@ class FirestoreService {
         });
   }
 
-  // Obtener todos los libros del usuario
   Stream<List<BookModel>> getUserBooks(String userId) {
     return _firestore
         .collection('books')
@@ -238,7 +280,6 @@ class FirestoreService {
         });
   }
 
-  // Obtener libro por ID
   Future<BookModel?> getBookById(String bookId) async {
     try {
       DocumentSnapshot doc = await _firestore
@@ -254,7 +295,6 @@ class FirestoreService {
     }
   }
 
-  // Actualizar libro
   Future<void> updateBook(String bookId, BookModel book) async {
     try {
       await _firestore
@@ -266,7 +306,6 @@ class FirestoreService {
     }
   }
 
-  // Actualizar progreso de lectura
   Future<void> updateReadingProgress(
     String bookId,
     int currentPage,
@@ -294,7 +333,6 @@ class FirestoreService {
     }
   }
 
-  // Eliminar libro
   Future<void> deleteBook(String bookId, String folderId) async {
     try {
       DocumentSnapshot bookDoc = await _firestore
@@ -302,29 +340,15 @@ class FirestoreService {
           .doc(bookId)
           .get();
 
-      if (bookDoc.exists) {
-        BookModel book = BookModel.fromFirestore(bookDoc);
-
-        if (book.pdfUrl.isNotEmpty) {
-          try {
-            await _storageService.deleteFile(book.pdfUrl);
-          } catch (e) {
-            // Continuar aunque falle
-          }
-        }
-
-        if (book.coverUrl != null && book.coverUrl!.isNotEmpty) {
-          try {
-            await _storageService.deleteFile(book.coverUrl!);
-          } catch (e) {
-            // Continuar aunque falle
-          }
-        }
+      if (!bookDoc.exists) {
+        throw Exception('El libro no existe');
       }
+
+      BookModel book = BookModel.fromFirestore(bookDoc);
 
       WriteBatch batch = _firestore.batch();
 
-      batch.delete(_firestore.collection('books').doc(bookId));
+      batch.delete(bookDoc.reference);
 
       DocumentReference folderRef = _firestore
           .collection('folders')
@@ -335,12 +359,31 @@ class FirestoreService {
       });
 
       await batch.commit();
+
+      _deleteBookFiles(book);
     } catch (e) {
       throw Exception('Error al eliminar libro: $e');
     }
   }
 
-  // Buscar libros por título
+  Future<void> _deleteBookFiles(BookModel book) async {
+    if (book.pdfUrl.isNotEmpty) {
+      try {
+        await _storageService.deleteFile(book.pdfUrl);
+      } catch (e) {
+        // Continuar si falla
+      }
+    }
+
+    if (book.coverUrl != null && book.coverUrl!.isNotEmpty) {
+      try {
+        await _storageService.deleteFile(book.coverUrl!);
+      } catch (e) {
+        // Continuar si falla
+      }
+    }
+  }
+
   Future<List<BookModel>> searchBooks(String userId, String query) async {
     try {
       QuerySnapshot snapshot = await _firestore
@@ -361,7 +404,6 @@ class FirestoreService {
     }
   }
 
-  // Obtener estadísticas del usuario
   Future<Map<String, dynamic>> getUserStats(String userId) async {
     try {
       QuerySnapshot books = await _firestore
@@ -390,6 +432,8 @@ class FirestoreService {
     }
   }
 
+  // ==================== NOTES ====================
+
   Future<String> createNote(NoteModel note) async {
     try {
       DocumentReference docRef = _firestore.collection('notes').doc();
@@ -414,7 +458,6 @@ class FirestoreService {
     }
   }
 
-  // Obtener todas las notas del usuario
   Stream<List<NoteModel>> getUserNotes(String userId) {
     return _firestore
         .collection('notes')
@@ -425,13 +468,11 @@ class FirestoreService {
               .map((doc) => NoteModel.fromFirestore(doc))
               .toList();
 
-          // Ordenar por fecha de creación (más reciente primero)
           notes.sort((a, b) => b.createdAt.compareTo(a.createdAt));
           return notes;
         });
   }
 
-  // Obtener notas de un libro específico
   Stream<List<NoteModel>> getBookNotes(String bookId) {
     return _firestore
         .collection('notes')
@@ -442,7 +483,6 @@ class FirestoreService {
               .map((doc) => NoteModel.fromFirestore(doc))
               .toList();
 
-          // Ordenar por número de página (si existe), luego por fecha
           notes.sort((a, b) {
             if (a.pageNumber != null && b.pageNumber != null) {
               return a.pageNumber!.compareTo(b.pageNumber!);
@@ -453,7 +493,6 @@ class FirestoreService {
         });
   }
 
-  // Obtener notas de una página específica de un libro
   Stream<List<NoteModel>> getPageNotes(String bookId, int pageNumber) {
     return _firestore
         .collection('notes')
@@ -467,7 +506,6 @@ class FirestoreService {
         });
   }
 
-  // Verificar si una página tiene notas
   Future<bool> hasNotesOnPage(String bookId, int pageNumber) async {
     try {
       QuerySnapshot snapshot = await _firestore
@@ -483,7 +521,6 @@ class FirestoreService {
     }
   }
 
-  // Obtener nota por ID
   Future<NoteModel?> getNoteById(String noteId) async {
     try {
       DocumentSnapshot doc = await _firestore
@@ -500,7 +537,6 @@ class FirestoreService {
     }
   }
 
-  // Actualizar nota
   Future<void> updateNote(String noteId, NoteModel note) async {
     try {
       await _firestore
@@ -512,7 +548,6 @@ class FirestoreService {
     }
   }
 
-  // Eliminar nota
   Future<void> deleteNote(String noteId) async {
     try {
       await _firestore.collection('notes').doc(noteId).delete();
@@ -521,7 +556,6 @@ class FirestoreService {
     }
   }
 
-  // Eliminar todas las notas de un libro
   Future<void> deleteBookNotes(String bookId) async {
     try {
       QuerySnapshot snapshot = await _firestore
@@ -541,7 +575,6 @@ class FirestoreService {
     }
   }
 
-  // Buscar notas por texto (título o contenido)
   Future<List<NoteModel>> searchNotes(String userId, String query) async {
     try {
       QuerySnapshot snapshot = await _firestore
@@ -564,7 +597,6 @@ class FirestoreService {
     }
   }
 
-  // Obtener estadísticas de notas
   Future<Map<String, dynamic>> getNotesStats(String userId) async {
     try {
       QuerySnapshot snapshot = await _firestore
@@ -585,6 +617,340 @@ class FirestoreService {
       };
     } catch (e) {
       throw Exception('Error al obtener estadísticas de notas: $e');
+    }
+  }
+
+  // ==================== TASK GROUPS ====================
+
+  Future<String> createTaskGroup(TaskGroupModel taskGroup) async {
+    try {
+      DocumentReference docRef = _firestore.collection('task_groups').doc();
+
+      final now = DateTime.now();
+      final taskGroupData = {
+        'userId': taskGroup.userId,
+        'name': taskGroup.name,
+        // ignore: deprecated_member_use
+        'colorValue': taskGroup.color.value,
+        'taskCount': 0,
+        'completedTaskCount': 0,
+        'createdAt': Timestamp.fromDate(now),
+        'updatedAt': Timestamp.fromDate(now),
+      };
+
+      await docRef.set(taskGroupData);
+      return docRef.id;
+    } catch (e) {
+      throw Exception('Error al crear grupo de tareas: $e');
+    }
+  }
+
+  Stream<List<TaskGroupModel>> getUserTaskGroups(String userId) {
+    return _firestore
+        .collection('task_groups')
+        .where('userId', isEqualTo: userId)
+        .snapshots()
+        .map((snapshot) {
+          var taskGroups = snapshot.docs
+              .map((doc) => TaskGroupModel.fromFirestore(doc))
+              .toList();
+
+          taskGroups.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          return taskGroups;
+        });
+  }
+
+  Future<TaskGroupModel?> getTaskGroupById(String taskGroupId) async {
+    try {
+      DocumentSnapshot doc = await _firestore
+          .collection('task_groups')
+          .doc(taskGroupId)
+          .get();
+      if (doc.exists) {
+        return TaskGroupModel.fromFirestore(doc);
+      }
+      return null;
+    } catch (e) {
+      throw Exception('Error al obtener grupo de tareas: $e');
+    }
+  }
+
+  Future<void> updateTaskGroup(
+    String taskGroupId,
+    TaskGroupModel taskGroup,
+  ) async {
+    try {
+      await _firestore
+          .collection('task_groups')
+          .doc(taskGroupId)
+          .update(taskGroup.toUpdateMap());
+    } catch (e) {
+      throw Exception('Error al actualizar grupo de tareas: $e');
+    }
+  }
+
+  Future<void> deleteTaskGroup(String taskGroupId) async {
+    try {
+      // Obtener todas las tareas del grupo
+      QuerySnapshot tasks = await _firestore
+          .collection('tasks')
+          .where('taskGroupId', isEqualTo: taskGroupId)
+          .get();
+
+      WriteBatch batch = _firestore.batch();
+
+      // Eliminar todas las tareas
+      for (var doc in tasks.docs) {
+        batch.delete(doc.reference);
+      }
+
+      // Eliminar el grupo
+      batch.delete(_firestore.collection('task_groups').doc(taskGroupId));
+
+      await batch.commit();
+    } catch (e) {
+      throw Exception('Error al eliminar grupo de tareas: $e');
+    }
+  }
+
+  Future<void> updateTaskGroupCounts(String taskGroupId) async {
+    try {
+      QuerySnapshot tasks = await _firestore
+          .collection('tasks')
+          .where('taskGroupId', isEqualTo: taskGroupId)
+          .get();
+
+      int taskCount = tasks.docs.length;
+      int completedTaskCount = tasks.docs.where((doc) {
+        Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+        return data['isCompleted'] == true;
+      }).length;
+
+      await _firestore.collection('task_groups').doc(taskGroupId).update({
+        'taskCount': taskCount,
+        'completedTaskCount': completedTaskCount,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      throw Exception('Error al actualizar contadores del grupo: $e');
+    }
+  }
+
+  // ==================== TASKS ====================
+
+  Future<String> createTask(TaskModel task) async {
+    try {
+      WriteBatch batch = _firestore.batch();
+
+      DocumentReference taskRef = _firestore.collection('tasks').doc();
+
+      final now = DateTime.now();
+      final taskData = {
+        'userId': task.userId,
+        'taskGroupId': task.taskGroupId,
+        'title': task.title,
+        'isCompleted': false,
+        'dueDate': task.dueDate != null
+            ? Timestamp.fromDate(task.dueDate!)
+            : null,
+        'reminderDate': task.reminderDate != null
+            ? Timestamp.fromDate(task.reminderDate!)
+            : null,
+        'repeatType': task.repeatType,
+        'customRepeatDays': task.customRepeatDays,
+        'createdAt': Timestamp.fromDate(now),
+        'updatedAt': Timestamp.fromDate(now),
+      };
+
+      batch.set(taskRef, taskData);
+
+      // Incrementar contador del grupo
+      DocumentReference groupRef = _firestore
+          .collection('task_groups')
+          .doc(task.taskGroupId);
+      batch.update(groupRef, {
+        'taskCount': FieldValue.increment(1),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      await batch.commit();
+
+      return taskRef.id;
+    } catch (e) {
+      throw Exception('Error al crear tarea: $e');
+    }
+  }
+
+  Stream<List<TaskModel>> getTaskGroupTasks(String taskGroupId) {
+    return _firestore
+        .collection('tasks')
+        .where('taskGroupId', isEqualTo: taskGroupId)
+        .snapshots()
+        .map((snapshot) {
+          var tasks = snapshot.docs
+              .map((doc) => TaskModel.fromFirestore(doc))
+              .toList();
+
+          // Ordenar: no completadas primero, luego por fecha de creación
+          tasks.sort((a, b) {
+            if (a.isCompleted != b.isCompleted) {
+              return a.isCompleted ? 1 : -1;
+            }
+            return b.createdAt.compareTo(a.createdAt);
+          });
+          return tasks;
+        });
+  }
+
+  Future<TaskModel?> getTaskById(String taskId) async {
+    try {
+      DocumentSnapshot doc = await _firestore
+          .collection('tasks')
+          .doc(taskId)
+          .get();
+      if (doc.exists) {
+        return TaskModel.fromFirestore(doc);
+      }
+      return null;
+    } catch (e) {
+      throw Exception('Error al obtener tarea: $e');
+    }
+  }
+
+  Future<void> updateTask(String taskId, TaskModel task) async {
+    try {
+      await _firestore
+          .collection('tasks')
+          .doc(taskId)
+          .update(task.toUpdateMap());
+    } catch (e) {
+      throw Exception('Error al actualizar tarea: $e');
+    }
+  }
+
+  Future<void> toggleTaskCompletion(
+    String taskId,
+    String taskGroupId,
+    bool isCompleted,
+  ) async {
+    try {
+      WriteBatch batch = _firestore.batch();
+
+      // Actualizar la tarea
+      DocumentReference taskRef = _firestore.collection('tasks').doc(taskId);
+      batch.update(taskRef, {
+        'isCompleted': isCompleted,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      // Actualizar contador del grupo
+      DocumentReference groupRef = _firestore
+          .collection('task_groups')
+          .doc(taskGroupId);
+      batch.update(groupRef, {
+        'completedTaskCount': FieldValue.increment(isCompleted ? 1 : -1),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      await batch.commit();
+    } catch (e) {
+      throw Exception('Error al cambiar estado de tarea: $e');
+    }
+  }
+
+  Future<void> deleteTask(
+    String taskId,
+    String taskGroupId,
+    bool wasCompleted,
+  ) async {
+    try {
+      WriteBatch batch = _firestore.batch();
+
+      // Eliminar la tarea
+      DocumentReference taskRef = _firestore.collection('tasks').doc(taskId);
+      batch.delete(taskRef);
+
+      // Actualizar contadores del grupo
+      DocumentReference groupRef = _firestore
+          .collection('task_groups')
+          .doc(taskGroupId);
+
+      Map<String, dynamic> updates = {
+        'taskCount': FieldValue.increment(-1),
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+
+      if (wasCompleted) {
+        updates['completedTaskCount'] = FieldValue.increment(-1);
+      }
+
+      batch.update(groupRef, updates);
+
+      await batch.commit();
+    } catch (e) {
+      throw Exception('Error al eliminar tarea: $e');
+    }
+  }
+
+  Future<List<TaskModel>> searchTasks(String userId, String query) async {
+    try {
+      QuerySnapshot snapshot = await _firestore
+          .collection('tasks')
+          .where('userId', isEqualTo: userId)
+          .get();
+
+      List<TaskModel> tasks = snapshot.docs
+          .map((doc) => TaskModel.fromFirestore(doc))
+          .where(
+            (task) => task.title.toLowerCase().contains(query.toLowerCase()),
+          )
+          .toList();
+
+      return tasks;
+    } catch (e) {
+      throw Exception('Error al buscar tareas: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> getTasksStats(String userId) async {
+    try {
+      QuerySnapshot snapshot = await _firestore
+          .collection('tasks')
+          .where('userId', isEqualTo: userId)
+          .get();
+
+      int totalTasks = snapshot.docs.length;
+      int completedTasks = snapshot.docs.where((doc) {
+        Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+        return data['isCompleted'] == true;
+      }).length;
+
+      int pendingTasks = totalTasks - completedTasks;
+
+      // Tareas con fecha de vencimiento hoy
+      DateTime now = DateTime.now();
+      DateTime today = DateTime(now.year, now.month, now.day);
+
+      int tasksToday = snapshot.docs.where((doc) {
+        Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+        if (data['dueDate'] == null) return false;
+        DateTime dueDate = (data['dueDate'] as Timestamp).toDate();
+        DateTime dueDateOnly = DateTime(
+          dueDate.year,
+          dueDate.month,
+          dueDate.day,
+        );
+        return dueDateOnly == today && data['isCompleted'] != true;
+      }).length;
+
+      return {
+        'totalTasks': totalTasks,
+        'completedTasks': completedTasks,
+        'pendingTasks': pendingTasks,
+        'tasksToday': tasksToday,
+      };
+    } catch (e) {
+      throw Exception('Error al obtener estadísticas de tareas: $e');
     }
   }
 }

@@ -11,6 +11,7 @@ class FolderModel {
   final DateTime createdAt;
   final DateTime? updatedAt;
   final int bookCount;
+  final String? parentFolderId; // 👈 NUEVO - null = carpeta raíz
 
   FolderModel({
     required this.id,
@@ -20,6 +21,7 @@ class FolderModel {
     required this.createdAt,
     this.updatedAt,
     this.bookCount = 0,
+    this.parentFolderId, // 👈 NUEVO
   });
 
   // Convertir de Firestore a Modelo
@@ -34,6 +36,8 @@ class FolderModel {
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       updatedAt: (data['updatedAt'] as Timestamp?)?.toDate(),
       bookCount: data['bookCount'] ?? 0,
+      parentFolderId:
+          data['parentId'], // 👈 CORRECCIÓN: Leer "parentId" de Firestore
     );
   }
 
@@ -47,6 +51,8 @@ class FolderModel {
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
       'bookCount': bookCount,
+      'parentId':
+          parentFolderId, // 👈 CORRECCIÓN: Guardar como "parentId" en Firestore
     };
   }
 
@@ -69,6 +75,7 @@ class FolderModel {
     DateTime? createdAt,
     DateTime? updatedAt,
     int? bookCount,
+    String? parentFolderId,
   }) {
     return FolderModel(
       id: id ?? this.id,
@@ -78,6 +85,13 @@ class FolderModel {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       bookCount: bookCount ?? this.bookCount,
+      parentFolderId: parentFolderId ?? this.parentFolderId,
     );
   }
+
+  // 👇 NUEVO - Verificar si es carpeta raíz
+  bool get isRootFolder => parentFolderId == null;
+
+  // 👇 NUEVO - Verificar si tiene padre
+  bool get hasParent => parentFolderId != null;
 }

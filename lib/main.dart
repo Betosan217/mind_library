@@ -7,11 +7,17 @@ import 'providers/auth_provider.dart';
 import 'providers/folder_provider.dart';
 import 'providers/book_provider.dart';
 import 'providers/note_provider.dart';
-import 'providers/reader_provider.dart'; // ✅ AGREGADO
+import 'providers/reader_provider.dart';
+import 'providers/theme_provider.dart';
+import 'providers/task_provider.dart';
+import 'services/notification_service.dart';
 import 'utils/app_theme.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/home/splash_screen.dart';
 import 'screens/home/home_screen.dart';
+import 'screens/task/task_detail_screen.dart';
+import 'models/task_model.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -19,32 +25,135 @@ void main() async {
   // Inicializar Firebase
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
+  // Inicializar servicio de notificaciones
+  await NotificationService().initialize();
+
+  // Pedir permisos de notificaciones
+  final granted = await NotificationService().requestPermissions();
+  if (granted) {}
+
   // Configurar orientación
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
 
   runApp(const MyApp());
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
+
+  @override
+  void initState() {
+    super.initState();
+    _listenToNotificationTaps();
+  }
+
+  void _listenToNotificationTaps() {
+    // Cuando app está abierta o en background
+    NotificationService.notificationTapStream.stream.listen((taskId) {
+      _navigateToTask(taskId);
+    });
+
+    // Cuando app estaba CERRADA
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      // Esperar a que la app termine de cargar
+      await Future.delayed(const Duration(milliseconds: 1000));
+
+      // Verificar si la app se abrió por una notificación
+      final NotificationAppLaunchDetails? notificationAppLaunchDetails =
+          await NotificationService().getNotificationAppLaunchDetails();
+
+      if (notificationAppLaunchDetails?.didNotificationLaunchApp ?? false) {
+        final String? taskId =
+            notificationAppLaunchDetails!.notificationResponse?.payload;
+
+        if (taskId != null) {
+          _navigateToTask(taskId);
+        }
+      }
+    });
+  }
+
+  void _navigateToTask(String taskId) async {
+    try {
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      final context = _navigatorKey.currentContext;
+      if (context == null || !context.mounted) {
+        return;
+      }
+
+      final taskProvider = context.read<TaskProvider>();
+
+      TaskModel? task;
+      String? taskGroupId;
+
+      for (var groupId in taskProvider.taskGroups.map((g) => g.id)) {
+        final tasks = taskProvider.getTasksForGroup(groupId);
+        try {
+          final foundTask = tasks.firstWhere((t) => t.id == taskId);
+          task = foundTask;
+          taskGroupId = groupId;
+          break;
+        } catch (e) {
+          continue;
+        }
+      }
+
+      if (task != null && taskGroupId != null && context.mounted) {
+        final taskGroup = taskProvider.taskGroups.firstWhere(
+          (g) => g.id == taskGroupId,
+        );
+
+        _navigatorKey.currentState?.push(
+          MaterialPageRoute(
+            builder: (context) => TaskDetailScreen(taskGroup: taskGroup),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error al navegar a tarea: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => FolderProvider()),
         ChangeNotifierProvider(create: (_) => BookProvider()),
-        ChangeNotifierProvider(create: (_) => ReaderProvider()), // ✅ AGREGADO
+        ChangeNotifierProvider(create: (_) => ReaderProvider()),
         ChangeNotifierProvider(create: (_) => NoteProvider()),
+        ChangeNotifierProvider(create: (_) => TaskProvider()),
       ],
-      child: MaterialApp(
-        debugShowCheckedModeBanner: false,
-        title: 'Mind Library',
-        theme: AppTheme.lightTheme,
-        darkTheme: AppTheme.darkTheme,
-        themeMode: ThemeMode.light,
-        home: const SplashWrapper(),
+      child: Consumer<ThemeProvider>(
+        builder: (context, themeProvider, _) {
+          if (themeProvider.isLoading) {
+            return MaterialApp(
+              debugShowCheckedModeBanner: false,
+              theme: AppTheme.lightTheme,
+              home: const SplashScreen(),
+            );
+          }
+
+          return MaterialApp(
+            navigatorKey: _navigatorKey,
+            debugShowCheckedModeBanner: false,
+            title: 'Wolib',
+            theme: AppTheme.lightTheme,
+            darkTheme: AppTheme.darkTheme,
+            themeMode: themeProvider.themeMode,
+            home: const SplashWrapper(),
+          );
+        },
       ),
     );
   }
@@ -110,7 +219,6 @@ class AuthWrapper extends StatefulWidget {
 
 class _AuthWrapperState extends State<AuthWrapper> {
   bool _streamsInitialized = false;
-
   @override
   Widget build(BuildContext context) {
     return Consumer<AuthProvider>(
@@ -124,13 +232,10 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
         // Si el usuario está autenticado
         if (authProvider.isAuthenticated) {
-          // ✅ CORREGIDO: Inicializar streams solo UNA VEZ
+          // Inicializar streams solo UNA VEZ
           if (!_streamsInitialized) {
-            // Usar addPostFrameCallback para asegurar que el context esté listo
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (mounted && authProvider.user != null) {
-                debugPrint('🚀 Inicializando streams...');
-
                 // Inicializar stream de carpetas
                 context.read<FolderProvider>().initFoldersStream();
 
@@ -142,8 +247,6 @@ class _AuthWrapperState extends State<AuthWrapper> {
                 setState(() {
                   _streamsInitialized = true;
                 });
-
-                debugPrint('✅ Streams inicializados correctamente');
               }
             });
           }
@@ -154,9 +257,11 @@ class _AuthWrapperState extends State<AuthWrapper> {
           if (_streamsInitialized) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (mounted) {
-                debugPrint('🛑 Deteniendo streams...');
                 context.read<FolderProvider>().stopFoldersStream();
                 context.read<BookProvider>().stopBooksStream();
+
+                NotificationService().cancelAllNotifications();
+
                 setState(() {
                   _streamsInitialized = false;
                 });

@@ -19,6 +19,9 @@ class _ReaderSettingsScreenState extends State<ReaderSettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Configuración de Lectura'),
@@ -43,9 +46,14 @@ class _ReaderSettingsScreenState extends State<ReaderSettingsScreen> {
                       DeviceOrientation.portraitUp,
                     ]);
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Modo vertical activado'),
-                        duration: Duration(seconds: 1),
+                      SnackBar(
+                        content: const Text('Modo vertical activado'),
+                        duration: const Duration(seconds: 1),
+                        backgroundColor: colorScheme.primary,
+                        behavior: SnackBarBehavior.floating,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                     );
                   },
@@ -63,9 +71,14 @@ class _ReaderSettingsScreenState extends State<ReaderSettingsScreen> {
                       DeviceOrientation.landscapeRight,
                     ]);
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Modo horizontal activado'),
-                        duration: Duration(seconds: 1),
+                      SnackBar(
+                        content: const Text('Modo horizontal activado'),
+                        duration: const Duration(seconds: 1),
+                        backgroundColor: colorScheme.primary,
+                        behavior: SnackBarBehavior.floating,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                     );
                   },
@@ -84,9 +97,14 @@ class _ReaderSettingsScreenState extends State<ReaderSettingsScreen> {
                       DeviceOrientation.landscapeRight,
                     ]);
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Rotación automática activada'),
-                        duration: Duration(seconds: 1),
+                      SnackBar(
+                        content: const Text('Rotación automática activada'),
+                        duration: const Duration(seconds: 1),
+                        backgroundColor: colorScheme.primary,
+                        behavior: SnackBarBehavior.floating,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                     );
                   },
@@ -95,7 +113,12 @@ class _ReaderSettingsScreenState extends State<ReaderSettingsScreen> {
             ),
           ),
 
-          const Divider(height: 32),
+          Divider(
+            height: 32,
+            color: theme.brightness == Brightness.light
+                ? AppColors.dividerLight
+                : AppColors.dividerDark,
+          ),
 
           // ========== ESTADÍSTICAS ==========
           _buildSection(
@@ -130,7 +153,12 @@ class _ReaderSettingsScreenState extends State<ReaderSettingsScreen> {
             ),
           ),
 
-          const Divider(height: 32),
+          Divider(
+            height: 32,
+            color: theme.brightness == Brightness.light
+                ? AppColors.dividerLight
+                : AppColors.dividerDark,
+          ),
 
           // ========== INFORMACIÓN ==========
           _buildSection(
@@ -139,9 +167,11 @@ class _ReaderSettingsScreenState extends State<ReaderSettingsScreen> {
             child: Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.blue.withValues(alpha: 0.1),
+                color: AppColors.info.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
+                border: Border.all(
+                  color: AppColors.info.withValues(alpha: 0.3),
+                ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -190,7 +220,7 @@ class _ReaderSettingsScreenState extends State<ReaderSettingsScreen> {
                   label: const Text('Reiniciar progreso'),
                   style: ElevatedButton.styleFrom(
                     minimumSize: const Size(double.infinity, 50),
-                    backgroundColor: Colors.orange,
+                    backgroundColor: AppColors.warning,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -206,7 +236,8 @@ class _ReaderSettingsScreenState extends State<ReaderSettingsScreen> {
                   label: const Text('Volver al lector'),
                   style: OutlinedButton.styleFrom(
                     minimumSize: const Size(double.infinity, 50),
-                    side: BorderSide(color: AppColors.primary),
+                    foregroundColor: colorScheme.primary,
+                    side: BorderSide(color: colorScheme.primary),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -227,6 +258,9 @@ class _ReaderSettingsScreenState extends State<ReaderSettingsScreen> {
     required IconData icon,
     required Widget child,
   }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(
@@ -234,14 +268,11 @@ class _ReaderSettingsScreenState extends State<ReaderSettingsScreen> {
         children: [
           Row(
             children: [
-              Icon(icon, size: 24, color: AppColors.primary),
+              Icon(icon, size: 24, color: colorScheme.primary),
               const SizedBox(width: 12),
               Text(
                 title,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: theme.textTheme.titleLarge?.copyWith(fontSize: 18),
               ),
             ],
           ),
@@ -259,6 +290,9 @@ class _ReaderSettingsScreenState extends State<ReaderSettingsScreen> {
     required bool selected,
     required VoidCallback onTap,
   }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
@@ -266,27 +300,34 @@ class _ReaderSettingsScreenState extends State<ReaderSettingsScreen> {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: selected
-              ? AppColors.primary.withValues(alpha: 0.1)
-              : Colors.grey[100],
+              ? colorScheme.primary.withValues(alpha: 0.1)
+              : colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: selected ? AppColors.primary : Colors.transparent,
+            color: selected ? colorScheme.primary : Colors.transparent,
             width: 2,
           ),
         ),
         child: Row(
           children: [
-            Icon(icon, color: selected ? AppColors.primary : Colors.black54),
+            Icon(
+              icon,
+              color: selected
+                  ? colorScheme.primary
+                  : colorScheme.onSurface.withValues(alpha: 0.6),
+            ),
             const SizedBox(width: 12),
             Text(
               title,
-              style: TextStyle(
+              style: theme.textTheme.bodyLarge?.copyWith(
                 fontWeight: selected ? FontWeight.bold : FontWeight.normal,
-                color: selected ? AppColors.primary : Colors.black87,
+                color: selected
+                    ? colorScheme.primary
+                    : colorScheme.onSurface.withValues(alpha: 0.87),
               ),
             ),
             const Spacer(),
-            if (selected) Icon(Icons.check_circle, color: AppColors.primary),
+            if (selected) Icon(Icons.check_circle, color: colorScheme.primary),
           ],
         ),
       ),
@@ -294,11 +335,14 @@ class _ReaderSettingsScreenState extends State<ReaderSettingsScreen> {
   }
 
   Widget _buildStatItem(String label, String value, IconData icon) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.grey[100],
+        color: colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -306,21 +350,25 @@ class _ReaderSettingsScreenState extends State<ReaderSettingsScreen> {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.1),
+              color: colorScheme.primary.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(icon, color: AppColors.primary, size: 20),
+            child: Icon(icon, color: colorScheme.primary, size: 20),
           ),
           const SizedBox(width: 16),
           Expanded(
             child: Text(
               label,
-              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurface.withValues(alpha: 0.7),
+              ),
             ),
           ),
           Text(
             value,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            style: theme.textTheme.bodyLarge?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ],
       ),
@@ -328,15 +376,20 @@ class _ReaderSettingsScreenState extends State<ReaderSettingsScreen> {
   }
 
   Widget _buildInfoRow(IconData icon, String text) {
+    final theme = Theme.of(context);
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 18, color: Colors.blue[700]),
+        Icon(icon, size: 18, color: AppColors.info),
         const SizedBox(width: 12),
         Expanded(
           child: Text(
             text,
-            style: TextStyle(fontSize: 13, color: Colors.blue[700]),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: AppColors.info,
+              fontSize: 13,
+            ),
           ),
         ),
       ],
@@ -344,18 +397,30 @@ class _ReaderSettingsScreenState extends State<ReaderSettingsScreen> {
   }
 
   void _showResetDialog() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Reiniciar progreso'),
-        content: const Text(
+        backgroundColor: theme.scaffoldBackgroundColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('Reiniciar progreso', style: theme.textTheme.titleLarge),
+        content: Text(
           '¿Estás seguro de que deseas reiniciar el progreso de lectura? '
           'Esta acción volverá a la página 1.',
+          style: theme.textTheme.bodyMedium,
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar'),
+            child: Text(
+              'Cancelar',
+              style: TextStyle(
+                color: colorScheme.onSurface.withValues(alpha: 0.8),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
           ElevatedButton(
             onPressed: () {
@@ -363,16 +428,23 @@ class _ReaderSettingsScreenState extends State<ReaderSettingsScreen> {
               readerProvider.resetProgress(widget.book.id);
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Progreso reiniciado correctamente'),
-                  backgroundColor: Colors.green,
-                  duration: Duration(seconds: 2),
+                SnackBar(
+                  content: const Text('Progreso reiniciado correctamente'),
+                  backgroundColor: AppColors.success,
+                  duration: const Duration(seconds: 2),
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               );
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
+              backgroundColor: AppColors.error,
               foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
             child: const Text('Reiniciar'),
           ),

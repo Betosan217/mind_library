@@ -2,20 +2,28 @@
 
 import 'package:flutter/material.dart';
 import '../../models/folder_model.dart';
-import '../../utils/app_colors.dart';
 import '../../screens/library/folder_detail_screen.dart';
+import '../../utils/app_colors.dart';
 
 /// Widget reutilizable para mostrar una carpeta con diseño apilado
 /// Tamaño fijo: 130x90
+///
+/// 🆕 NUEVO: enableNavigation permite controlar si se navega automáticamente
 class FolderItem extends StatelessWidget {
   final FolderModel folder;
+  final bool enableNavigation; // 🆕 NUEVO parámetro
 
-  const FolderItem({super.key, required this.folder});
+  const FolderItem({
+    super.key,
+    required this.folder,
+    this.enableNavigation = true, // 🆕 Por defecto habilitado (para HomeScreen)
+  });
 
   @override
   Widget build(BuildContext context) {
+    // 🔥 SOLUCIÓN: Solo navegar si está habilitado
     return GestureDetector(
-      onTap: () => _navigateToDetail(context),
+      onTap: enableNavigation ? () => _navigateToDetail(context) : null,
       child: _StackedFolderCard(folder: folder),
     );
   }
@@ -38,6 +46,8 @@ class _StackedFolderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     // Tamaño del contenedor principal
     const double containerWidth = 130;
     const double containerHeight = 90;
@@ -64,11 +74,13 @@ class _StackedFolderCard extends StatelessWidget {
       width: containerWidth,
       height: containerHeight,
       decoration: BoxDecoration(
-        color: Colors.white,
+        // En tema oscuro: gris oscuro para contrastar con fondo negro
+        // En tema claro: fondo blanco
+        color: isDark ? AppColors.surfaceDark : Colors.white,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
+            color: isDark ? AppColors.shadowDark : AppColors.shadowLight,
             blurRadius: 10,
             offset: const Offset(0, 3),
           ),
@@ -130,7 +142,7 @@ class _StackedFolderCard extends StatelessWidget {
             ),
           ),
 
-          // Capa 1 - Frontal blanca con contenido - SIN SOMBRAS NI BORDES
+          // Capa 1 - Frontal con contenido - SIN SOMBRAS NI BORDES
           Positioned(
             top: cardPadding + 12,
             left: cardPadding + 3,
@@ -138,10 +150,10 @@ class _StackedFolderCard extends StatelessWidget {
             child: Container(
               height: cardHeight,
               decoration: BoxDecoration(
-                color: Colors.white,
+                // En tema oscuro: gris oscuro para contrastar
+                // En tema claro: fondo blanco
+                color: isDark ? AppColors.surfaceDark : Colors.white,
                 borderRadius: BorderRadius.circular(16),
-                // ❌ SIN boxShadow
-                // ❌ SIN border
               ),
               child: Column(
                 children: [
@@ -151,7 +163,9 @@ class _StackedFolderCard extends StatelessWidget {
                     width: 24,
                     height: 2,
                     decoration: BoxDecoration(
-                      color: Colors.grey[300],
+                      color: isDark
+                          ? AppColors.dividerDark
+                          : AppColors.dividerLight,
                       borderRadius: BorderRadius.circular(1),
                     ),
                   ),
@@ -169,10 +183,10 @@ class _StackedFolderCard extends StatelessWidget {
                         children: [
                           Text(
                             folder.name,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
-                              color: Colors.black87,
+                              color: Theme.of(context).colorScheme.onSurface,
                               height: 1.2,
                             ),
                             maxLines: 2,
@@ -183,7 +197,9 @@ class _StackedFolderCard extends StatelessWidget {
                             '${folder.bookCount} ${folder.bookCount == 1 ? 'libro' : 'libros'}',
                             style: TextStyle(
                               fontSize: 9,
-                              color: Colors.grey[500],
+                              color: isDark
+                                  ? AppColors.textTertiaryDark
+                                  : AppColors.textTertiaryLight,
                             ),
                           ),
                         ],
@@ -195,73 +211,6 @@ class _StackedFolderCard extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-// ============= LIST ITEM (Vista de lista horizontal - OPCIONAL) =============
-class FolderListItem extends StatelessWidget {
-  final FolderModel folder;
-
-  const FolderListItem({super.key, required this.folder});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.grey200, width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        leading: Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [folder.color.withValues(alpha: 0.8), folder.color],
-            ),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: const Icon(
-            Icons.folder_rounded,
-            color: Colors.white,
-            size: 26,
-          ),
-        ),
-        title: Text(
-          folder.name,
-          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
-        ),
-        subtitle: Text(
-          '${folder.bookCount} ${folder.bookCount == 1 ? 'libro' : 'libros'}',
-          style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-        ),
-        trailing: Icon(
-          Icons.arrow_forward_ios_rounded,
-          size: 16,
-          color: Colors.grey[400],
-        ),
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => FolderDetailScreen(folder: folder),
-            ),
-          );
-        },
       ),
     );
   }

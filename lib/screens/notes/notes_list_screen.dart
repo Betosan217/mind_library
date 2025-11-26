@@ -1,4 +1,4 @@
-// lib/screens/notes/notes_list_screen.dart (MEJORADO CON ICONOS SVG)
+// lib/screens/notes/notes_list_screen.dart (ADAPTADO PARA TEMA CLARO/OSCURO)
 
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
@@ -42,50 +42,53 @@ class _NotesListScreenState extends State<NotesListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return GestureDetector(
       onTap: () => _searchFocusNode.unfocus(),
       child: Scaffold(
-        backgroundColor: Colors.white,
-        resizeToAvoidBottomInset:
-            false, // Evita que el FAB se mueva con el teclado
+        backgroundColor: isDark
+            ? Theme.of(context).scaffoldBackgroundColor
+            : Colors.white,
+        resizeToAvoidBottomInset: false,
         appBar: AppBar(
-          backgroundColor: Colors.white,
+          backgroundColor: isDark
+              ? Theme.of(context).scaffoldBackgroundColor
+              : Colors.white,
           elevation: 0,
           leading: IconButton(
             icon: SvgPicture.asset(
               'assets/icons/arrow_back.svg',
               width: 22,
               height: 22,
-              colorFilter: ColorFilter.mode(Colors.grey[700]!, BlendMode.srcIn),
+              colorFilter: ColorFilter.mode(
+                Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                BlendMode.srcIn,
+              ),
             ),
             onPressed: () {
               _searchFocusNode.unfocus();
               Navigator.pop(context);
             },
           ),
-          title: const Text(
+          title: Text(
             'Mis Notas',
-            style: TextStyle(
-              color: Colors.black87,
-              fontSize: 20,
-              fontWeight: FontWeight.w600,
-              letterSpacing: -0.5,
-            ),
+            style: Theme.of(context).textTheme.titleLarge,
           ),
           centerTitle: true,
         ),
         body: Column(
           children: [
-            _buildSearchBar(),
+            _buildSearchBar(isDark),
             const SizedBox(height: 16),
             Expanded(
               child: Consumer<NoteProvider>(
                 builder: (context, noteProvider, _) {
                   if (noteProvider.isLoading && noteProvider.notes.isEmpty) {
-                    return const Center(
+                    return Center(
                       child: CircularProgressIndicator(
                         valueColor: AlwaysStoppedAnimation<Color>(
-                          AppColors.primary,
+                          Theme.of(context).colorScheme.primary,
                         ),
                       ),
                     );
@@ -125,7 +128,7 @@ class _NotesListScreenState extends State<NotesListScreen> {
                     padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
                     itemCount: filteredNotes.length,
                     itemBuilder: (context, index) {
-                      return _buildNoteCard(filteredNotes[index]);
+                      return _buildNoteCard(filteredNotes[index], isDark);
                     },
                   );
                 },
@@ -139,18 +142,25 @@ class _NotesListScreenState extends State<NotesListScreen> {
     );
   }
 
-  Widget _buildSearchBar() {
+  Widget _buildSearchBar(bool isDark) {
     return Container(
       margin: const EdgeInsets.fromLTRB(20, 16, 20, 0),
       padding: const EdgeInsets.symmetric(horizontal: 16),
       height: 50,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark
+            ? Theme.of(context).colorScheme.surface
+            : const Color(0xFFF5F5F5),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey[200]!, width: 1.5),
+        border: Border.all(
+          color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
+          width: 1.5,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
+            color: isDark
+                ? AppColors.shadowDark
+                : Colors.black.withValues(alpha: 0.04),
             blurRadius: 12,
             offset: const Offset(0, 2),
           ),
@@ -162,7 +172,10 @@ class _NotesListScreenState extends State<NotesListScreen> {
             'assets/icons/search_note.svg',
             width: 20,
             height: 20,
-            colorFilter: ColorFilter.mode(Colors.grey[400]!, BlendMode.srcIn),
+            colorFilter: ColorFilter.mode(
+              Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+              BlendMode.srcIn,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -176,13 +189,15 @@ class _NotesListScreenState extends State<NotesListScreen> {
               },
               style: TextStyle(
                 fontSize: 15,
-                color: Colors.grey[800],
+                color: Theme.of(context).colorScheme.onSurface,
                 fontWeight: FontWeight.w500,
               ),
               decoration: InputDecoration(
                 hintText: 'Buscar notas...',
                 hintStyle: TextStyle(
-                  color: Colors.grey[400],
+                  color: isDark
+                      ? AppColors.textHintDark
+                      : AppColors.textHintLight,
                   fontWeight: FontWeight.w400,
                 ),
                 border: InputBorder.none,
@@ -201,7 +216,9 @@ class _NotesListScreenState extends State<NotesListScreen> {
                         child: Icon(
                           Icons.close_rounded,
                           size: 20,
-                          color: Colors.grey[400],
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withValues(alpha: 0.4),
                         ),
                       )
                     : null,
@@ -212,19 +229,25 @@ class _NotesListScreenState extends State<NotesListScreen> {
               ),
             ),
           ),
-          Container(width: 1, height: 24, color: Colors.grey[200]),
+          Container(
+            width: 1,
+            height: 24,
+            color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
+          ),
           const SizedBox(width: 8),
           GestureDetector(
             key: _filterButtonKey,
             onTap: () {
               _searchFocusNode.unfocus();
-              _showFilterPopup();
+              _showFilterPopup(isDark);
             },
             child: Container(
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
                 color: _filterCategory != null
-                    ? AppColors.primary.withValues(alpha: 0.1)
+                    ? Theme.of(
+                        context,
+                      ).colorScheme.primary.withValues(alpha: 0.1)
                     : Colors.transparent,
                 borderRadius: BorderRadius.circular(8),
               ),
@@ -234,8 +257,10 @@ class _NotesListScreenState extends State<NotesListScreen> {
                 height: 20,
                 colorFilter: ColorFilter.mode(
                   _filterCategory != null
-                      ? AppColors.primary
-                      : Colors.grey[600]!,
+                      ? Theme.of(context).colorScheme.primary
+                      : Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withValues(alpha: 0.6),
                   BlendMode.srcIn,
                 ),
               ),
@@ -246,15 +271,20 @@ class _NotesListScreenState extends State<NotesListScreen> {
     );
   }
 
-  Widget _buildNoteCard(NoteModel note) {
+  Widget _buildNoteCard(NoteModel note, bool isDark) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? Theme.of(context).colorScheme.surface : Colors.white,
         borderRadius: BorderRadius.circular(16),
+        border: isDark
+            ? null
+            : Border.all(color: AppColors.dividerLight, width: 1),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
+            color: isDark
+                ? AppColors.shadowDark
+                : Colors.black.withValues(alpha: 0.04),
             blurRadius: 12,
             offset: const Offset(0, 2),
           ),
@@ -278,7 +308,7 @@ class _NotesListScreenState extends State<NotesListScreen> {
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
-                          color: Colors.grey[800],
+                          color: Theme.of(context).colorScheme.onSurface,
                           letterSpacing: -0.3,
                         ),
                         maxLines: 1,
@@ -288,19 +318,23 @@ class _NotesListScreenState extends State<NotesListScreen> {
                     PopupMenuButton<String>(
                       icon: Icon(
                         Icons.more_vert_rounded,
-                        color: Colors.grey[400],
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withValues(alpha: 0.4),
                         size: 20,
                       ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      color: Colors.white,
+                      color: isDark
+                          ? Theme.of(context).colorScheme.surface
+                          : Colors.white,
                       elevation: 8,
                       onSelected: (value) {
                         if (value == 'edit') {
                           _showEditNoteSheet(note);
                         } else if (value == 'delete') {
-                          _confirmDelete(note);
+                          _confirmDelete(note, isDark);
                         }
                       },
                       itemBuilder: (context) => [
@@ -314,7 +348,8 @@ class _NotesListScreenState extends State<NotesListScreen> {
                                 width: 18,
                                 height: 18,
                                 colorFilter: ColorFilter.mode(
-                                  Colors.grey[600]!,
+                                  Theme.of(context).colorScheme.onSurface
+                                      .withValues(alpha: 0.6),
                                   BlendMode.srcIn,
                                 ),
                               ),
@@ -323,7 +358,8 @@ class _NotesListScreenState extends State<NotesListScreen> {
                                 'Editar',
                                 style: TextStyle(
                                   fontSize: 14,
-                                  color: Colors.grey[700],
+                                  color: Theme.of(context).colorScheme.onSurface
+                                      .withValues(alpha: 0.7),
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
@@ -340,7 +376,7 @@ class _NotesListScreenState extends State<NotesListScreen> {
                                 width: 18,
                                 height: 18,
                                 colorFilter: const ColorFilter.mode(
-                                  Colors.red,
+                                  AppColors.error,
                                   BlendMode.srcIn,
                                 ),
                               ),
@@ -349,7 +385,7 @@ class _NotesListScreenState extends State<NotesListScreen> {
                                 'Eliminar',
                                 style: TextStyle(
                                   fontSize: 14,
-                                  color: Colors.red,
+                                  color: AppColors.error,
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
@@ -367,7 +403,7 @@ class _NotesListScreenState extends State<NotesListScreen> {
                       _buildBadge(
                         icon: 'assets/icons/bookmark.svg',
                         label: 'Pág. ${note.pageNumber}',
-                        color: AppColors.primary,
+                        color: Theme.of(context).colorScheme.primary,
                       ),
                       const SizedBox(width: 8),
                     ],
@@ -383,7 +419,9 @@ class _NotesListScreenState extends State<NotesListScreen> {
                       note.formattedDate,
                       style: TextStyle(
                         fontSize: 12,
-                        color: Colors.grey[400],
+                        color: isDark
+                            ? AppColors.textTertiaryDark
+                            : AppColors.textTertiaryLight,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -447,21 +485,27 @@ class _NotesListScreenState extends State<NotesListScreen> {
             repeat: true,
             animate: true,
           ),
-
           const SizedBox(height: 24),
           Text(
             'No tienes notas',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w600,
-              color: Colors.grey[600],
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: 0.6),
               letterSpacing: -0.3,
             ),
           ),
           const SizedBox(height: 8),
           Text(
             'Crea tu primera nota para empezar',
-            style: TextStyle(fontSize: 14, color: Colors.grey[400]),
+            style: TextStyle(
+              fontSize: 14,
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: 0.4),
+            ),
           ),
         ],
       ),
@@ -486,14 +530,21 @@ class _NotesListScreenState extends State<NotesListScreen> {
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w600,
-              color: Colors.grey[600],
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: 0.6),
               letterSpacing: -0.3,
             ),
           ),
           const SizedBox(height: 8),
           Text(
             'Intenta con otros términos de búsqueda',
-            style: TextStyle(fontSize: 14, color: Colors.grey[400]),
+            style: TextStyle(
+              fontSize: 14,
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: 0.4),
+            ),
           ),
         ],
       ),
@@ -507,8 +558,8 @@ class _NotesListScreenState extends State<NotesListScreen> {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            AppColors.primary,
-            AppColors.primary.withValues(alpha: 0.85),
+            Theme.of(context).colorScheme.primary,
+            Theme.of(context).colorScheme.primary.withValues(alpha: 0.85),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -516,7 +567,7 @@ class _NotesListScreenState extends State<NotesListScreen> {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.3),
+            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
             blurRadius: 12,
             offset: const Offset(0, 6),
           ),
@@ -532,8 +583,8 @@ class _NotesListScreenState extends State<NotesListScreen> {
               'assets/icons/add_file.svg',
               width: 28,
               height: 28,
-              colorFilter: const ColorFilter.mode(
-                Colors.white,
+              colorFilter: ColorFilter.mode(
+                Theme.of(context).colorScheme.onPrimary,
                 BlendMode.srcIn,
               ),
             ),
@@ -543,7 +594,7 @@ class _NotesListScreenState extends State<NotesListScreen> {
     );
   }
 
-  void _showFilterPopup() {
+  void _showFilterPopup(bool isDark) {
     final RenderBox? button =
         _filterButtonKey.currentContext?.findRenderObject() as RenderBox?;
     if (button == null) return;
@@ -571,14 +622,14 @@ class _NotesListScreenState extends State<NotesListScreen> {
       position: position,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       elevation: 8,
-      color: Colors.white,
+      color: isDark ? Theme.of(context).colorScheme.surface : Colors.white,
       items: [
-        _buildFilterItem('Todas', null),
-        _buildFilterItem('Resumen', 'Resumen'),
-        _buildFilterItem('Importante', 'Importante'),
-        _buildFilterItem('Duda', 'Duda'),
-        _buildFilterItem('Idea', 'Idea'),
-        _buildFilterItem('Pendiente', 'Pendiente'),
+        _buildFilterItem('Todas', null, isDark),
+        _buildFilterItem('Resumen', 'Resumen', isDark),
+        _buildFilterItem('Importante', 'Importante', isDark),
+        _buildFilterItem('Duda', 'Duda', isDark),
+        _buildFilterItem('Idea', 'Idea', isDark),
+        _buildFilterItem('Pendiente', 'Pendiente', isDark),
       ],
     ).then((value) {
       if (value != null) {
@@ -589,7 +640,11 @@ class _NotesListScreenState extends State<NotesListScreen> {
     });
   }
 
-  PopupMenuItem<String> _buildFilterItem(String title, String? value) {
+  PopupMenuItem<String> _buildFilterItem(
+    String title,
+    String? value,
+    bool isDark,
+  ) {
     final isSelected = _filterCategory == value;
 
     return PopupMenuItem<String>(
@@ -604,7 +659,9 @@ class _NotesListScreenState extends State<NotesListScreen> {
             width: 20,
             height: 20,
             colorFilter: ColorFilter.mode(
-              isSelected ? AppColors.primary : Colors.grey[300]!,
+              isSelected
+                  ? Theme.of(context).colorScheme.primary
+                  : (isDark ? AppColors.grey700 : AppColors.grey300),
               BlendMode.srcIn,
             ),
           ),
@@ -615,7 +672,11 @@ class _NotesListScreenState extends State<NotesListScreen> {
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                color: isSelected ? AppColors.primary : Colors.grey[700],
+                color: isSelected
+                    ? Theme.of(context).colorScheme.primary
+                    : Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.7),
               ),
             ),
           ),
@@ -655,24 +716,33 @@ class _NotesListScreenState extends State<NotesListScreen> {
     );
   }
 
-  void _confirmDelete(NoteModel note) {
+  void _confirmDelete(NoteModel note, bool isDark) {
     _searchFocusNode.unfocus();
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        backgroundColor: Colors.white,
+        backgroundColor: isDark
+            ? Theme.of(context).colorScheme.surface
+            : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text(
+        title: Text(
           'Eliminar Nota',
           style: TextStyle(
             fontWeight: FontWeight.w700,
             fontSize: 18,
             letterSpacing: -0.5,
+            color: Theme.of(context).colorScheme.onSurface,
           ),
         ),
         content: Text(
           '¿Estás seguro de eliminar "${note.title}"?',
-          style: TextStyle(color: Colors.grey[700], fontSize: 14, height: 1.5),
+          style: TextStyle(
+            color: Theme.of(
+              context,
+            ).colorScheme.onSurface.withValues(alpha: 0.7),
+            fontSize: 14,
+            height: 1.5,
+          ),
         ),
         actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         actions: [
@@ -680,14 +750,19 @@ class _NotesListScreenState extends State<NotesListScreen> {
             height: 44,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey[300]!, width: 1.5),
+              border: Border.all(
+                color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
+                width: 1.5,
+              ),
             ),
             child: TextButton(
               onPressed: () => Navigator.pop(dialogContext),
               child: Text(
                 'Cancelar',
                 style: TextStyle(
-                  color: Colors.grey[700],
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withValues(alpha: 0.7),
                   fontWeight: FontWeight.w600,
                   fontSize: 14,
                 ),
@@ -700,11 +775,11 @@ class _NotesListScreenState extends State<NotesListScreen> {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
               gradient: const LinearGradient(
-                colors: [Colors.red, Color(0xFFE53935)],
+                colors: [AppColors.error, Color(0xFFE53935)],
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.red.withValues(alpha: 0.3),
+                  color: AppColors.error.withValues(alpha: 0.3),
                   blurRadius: 8,
                   offset: const Offset(0, 2),
                 ),
@@ -726,7 +801,9 @@ class _NotesListScreenState extends State<NotesListScreen> {
                     content: Text(
                       success ? 'Nota eliminada' : 'Error al eliminar nota',
                     ),
-                    backgroundColor: success ? Colors.green : Colors.red,
+                    backgroundColor: success
+                        ? AppColors.success
+                        : AppColors.error,
                   ),
                 );
               },

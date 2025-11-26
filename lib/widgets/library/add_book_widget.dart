@@ -1,6 +1,9 @@
+// lib/widgets/add_book_widget.dart (ADAPTADO A TEMAS CLARO/OSCURO)
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'dart:io';
 import '../../models/folder_model.dart';
 import '../../providers/book_provider.dart';
@@ -95,6 +98,9 @@ class _AddBookWidgetState extends State<AddBookWidget>
           content: Text('Error al seleccionar archivo: $e'),
           backgroundColor: AppColors.error,
           behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
         ),
       );
     }
@@ -116,10 +122,13 @@ class _AddBookWidgetState extends State<AddBookWidget>
         if (!mounted) return;
 
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Por favor selecciona un archivo PDF'),
+          SnackBar(
+            content: const Text('Por favor selecciona un archivo PDF'),
             backgroundColor: AppColors.error,
             behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
           ),
         );
         return;
@@ -147,6 +156,9 @@ class _AddBookWidgetState extends State<AddBookWidget>
             ),
             backgroundColor: AppColors.error,
             behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
           ),
         );
       }
@@ -155,11 +167,14 @@ class _AddBookWidgetState extends State<AddBookWidget>
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Consumer<BookProvider>(
       builder: (context, bookProvider, child) {
         return Container(
           decoration: BoxDecoration(
-            color: Colors.grey[50],
+            color: isDark ? theme.colorScheme.surface : Colors.white,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           ),
           child: Column(
@@ -177,7 +192,9 @@ class _AddBookWidgetState extends State<AddBookWidget>
                           width: 36,
                           height: 4,
                           decoration: BoxDecoration(
-                            color: Colors.grey.shade300,
+                            color: isDark
+                                ? AppColors.grey700
+                                : AppColors.grey300,
                             borderRadius: BorderRadius.circular(2),
                           ),
                         ),
@@ -195,15 +212,25 @@ class _AddBookWidgetState extends State<AddBookWidget>
                           width: 32,
                           height: 32,
                           decoration: BoxDecoration(
-                            color: Colors.grey.shade200,
+                            color: isDark
+                                ? AppColors.surfaceVariantDark
+                                : const Color(0xFFF5F5F5),
                             shape: BoxShape.circle,
                           ),
-                          child: Icon(
-                            Icons.close_rounded,
-                            size: 20,
-                            color: bookProvider.isUploading
-                                ? Colors.grey.shade400
-                                : Colors.grey[700],
+                          child: SvgPicture.asset(
+                            'assets/icons/close.svg',
+                            width: 20,
+                            height: 20,
+                            colorFilter: ColorFilter.mode(
+                              bookProvider.isUploading
+                                  ? (isDark
+                                        ? AppColors.grey600
+                                        : AppColors.grey400)
+                                  : (isDark
+                                        ? AppColors.textSecondaryDark
+                                        : AppColors.textSecondaryLight),
+                              BlendMode.srcIn,
+                            ),
                           ),
                         ),
                       ),
@@ -217,12 +244,10 @@ class _AddBookWidgetState extends State<AddBookWidget>
                 padding: const EdgeInsets.symmetric(horizontal: 24),
                 child: Column(
                   children: [
-                    const Text(
+                    Text(
                       'Agregar Libro',
-                      style: TextStyle(
-                        fontSize: 22,
+                      style: theme.textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.w700,
-                        color: Colors.black87,
                         letterSpacing: -0.5,
                       ),
                     ),
@@ -230,10 +255,14 @@ class _AddBookWidgetState extends State<AddBookWidget>
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(
-                          Icons.folder_rounded,
-                          size: 14,
-                          color: widget.folder.color,
+                        SvgPicture.asset(
+                          'assets/icons/folder_icon.svg',
+                          width: 14,
+                          height: 14,
+                          colorFilter: ColorFilter.mode(
+                            widget.folder.color,
+                            BlendMode.srcIn,
+                          ),
                         ),
                         const SizedBox(width: 6),
                         Text(
@@ -293,21 +322,11 @@ class _AddBookWidgetState extends State<AddBookWidget>
                 ),
               ),
 
-              // Botones de acción (fijos abajo)
+              // Botones de acción (fijos abajo) - SIN SOMBRA
               Container(
                 padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
                 decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(20),
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, -2),
-                    ),
-                  ],
+                  color: isDark ? theme.colorScheme.surface : Colors.white,
                 ),
                 child: SafeArea(child: _buildActionButtons(bookProvider)),
               ),
@@ -319,14 +338,20 @@ class _AddBookWidgetState extends State<AddBookWidget>
   }
 
   Widget _buildSelectPdfCard() {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return GestureDetector(
       onTap: _pickPDF,
       child: Container(
         height: 180,
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: isDark ? theme.colorScheme.surface : const Color(0xFFF5F5F5),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.grey.shade200, width: 1.5),
+          border: Border.all(
+            color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
+            width: 1.5,
+          ),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -335,31 +360,36 @@ class _AddBookWidgetState extends State<AddBookWidget>
               width: 56,
               height: 56,
               decoration: BoxDecoration(
-                color: Colors.grey.shade100,
+                color: isDark ? AppColors.surfaceVariantDark : Colors.white,
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: Icon(
-                Icons.upload_file_rounded,
-                size: 28,
-                color: Colors.grey.shade400,
+              child: Center(
+                child: SvgPicture.asset(
+                  'assets/icons/export.svg',
+                  width: 28,
+                  height: 28,
+                  colorFilter: ColorFilter.mode(
+                    isDark ? AppColors.textHintDark : AppColors.textHintLight,
+                    BlendMode.srcIn,
+                  ),
+                ),
               ),
             ),
             const SizedBox(height: 14),
             Text(
               'Seleccionar PDF',
-              style: TextStyle(
-                fontSize: 15,
+              style: theme.textTheme.bodyLarge?.copyWith(
                 fontWeight: FontWeight.w600,
-                color: Colors.grey.shade800,
                 letterSpacing: -0.3,
               ),
             ),
             const SizedBox(height: 4),
             Text(
               'Toca para elegir un archivo',
-              style: TextStyle(
-                fontSize: 13,
-                color: Colors.grey.shade500,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: isDark
+                    ? AppColors.textTertiaryDark
+                    : AppColors.textTertiaryLight,
                 fontWeight: FontWeight.w400,
               ),
             ),
@@ -370,10 +400,13 @@ class _AddBookWidgetState extends State<AddBookWidget>
   }
 
   Widget _buildPdfPreviewCard() {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? theme.colorScheme.surface : Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: widget.folder.color.withValues(alpha: 0.15),
@@ -393,10 +426,16 @@ class _AddBookWidgetState extends State<AddBookWidget>
                   color: widget.folder.color.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(
-                  Icons.picture_as_pdf_rounded,
-                  size: 26,
-                  color: widget.folder.color,
+                child: Center(
+                  child: SvgPicture.asset(
+                    'assets/icons/add_pdf.svg',
+                    width: 26,
+                    height: 26,
+                    colorFilter: ColorFilter.mode(
+                      widget.folder.color,
+                      BlendMode.srcIn,
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(width: 14),
@@ -408,10 +447,8 @@ class _AddBookWidgetState extends State<AddBookWidget>
                   children: [
                     Text(
                       _pdfFileName ?? 'Archivo PDF',
-                      style: const TextStyle(
-                        fontSize: 14,
+                      style: theme.textTheme.bodyMedium?.copyWith(
                         fontWeight: FontWeight.w600,
-                        color: Colors.black87,
                         letterSpacing: -0.2,
                       ),
                       maxLines: 2,
@@ -442,9 +479,10 @@ class _AddBookWidgetState extends State<AddBookWidget>
                           const SizedBox(width: 8),
                           Text(
                             _formatFileSize(_pdfFileSize!),
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey.shade600,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: isDark
+                                  ? AppColors.textSecondaryDark
+                                  : AppColors.textSecondaryLight,
                               fontWeight: FontWeight.w500,
                             ),
                           ),
@@ -463,10 +501,16 @@ class _AddBookWidgetState extends State<AddBookWidget>
                   onTap: _removePDF,
                   child: Container(
                     padding: const EdgeInsets.all(6),
-                    child: Icon(
-                      Icons.close_rounded,
-                      size: 20,
-                      color: Colors.grey.shade500,
+                    child: SvgPicture.asset(
+                      'assets/icons/close.svg',
+                      width: 20,
+                      height: 20,
+                      colorFilter: ColorFilter.mode(
+                        isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondaryLight,
+                        BlendMode.srcIn,
+                      ),
                     ),
                   ),
                 ),
@@ -485,25 +529,37 @@ class _AddBookWidgetState extends State<AddBookWidget>
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 9),
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade50,
+                  color: isDark
+                      ? AppColors.surfaceVariantDark
+                      : const Color(0xFFF5F5F5),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.grey.shade200, width: 1),
+                  border: Border.all(
+                    color: isDark
+                        ? AppColors.dividerDark
+                        : AppColors.dividerLight,
+                    width: 1,
+                  ),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(
-                      Icons.swap_horiz_rounded,
-                      size: 18,
-                      color: Colors.grey.shade600,
+                    SvgPicture.asset(
+                      'assets/icons/swap.svg',
+                      width: 18,
+                      height: 18,
+                      colorFilter: ColorFilter.mode(
+                        isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondaryLight,
+                        BlendMode.srcIn,
+                      ),
                     ),
                     const SizedBox(width: 7),
                     Text(
                       'Cambiar archivo',
-                      style: TextStyle(
-                        fontSize: 13,
+                      style: theme.textTheme.bodySmall?.copyWith(
                         fontWeight: FontWeight.w600,
-                        color: Colors.grey.shade700,
+                        letterSpacing: -0.2,
                       ),
                     ),
                   ],
@@ -517,6 +573,9 @@ class _AddBookWidgetState extends State<AddBookWidget>
   }
 
   Widget _buildTitleField(BookProvider bookProvider) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -524,41 +583,81 @@ class _AddBookWidgetState extends State<AddBookWidget>
           padding: const EdgeInsets.only(left: 2, bottom: 8),
           child: Text(
             'Título del libro',
-            style: TextStyle(
-              fontSize: 13,
+            style: theme.textTheme.bodySmall?.copyWith(
               fontWeight: FontWeight.w600,
-              color: Colors.grey.shade700,
+              color: isDark
+                  ? AppColors.textSecondaryDark
+                  : AppColors.textSecondaryLight,
               letterSpacing: -0.2,
             ),
           ),
         ),
         Container(
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: isDark ? theme.colorScheme.surface : const Color(0xFFF5F5F5),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.grey.shade200, width: 1.5),
+            border: Border.all(
+              color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
+              width: 1.5,
+            ),
           ),
           child: TextFormField(
             controller: _titleController,
             enabled: !bookProvider.isUploading,
-            style: const TextStyle(
-              fontSize: 15,
+            style: theme.textTheme.bodyMedium?.copyWith(
               fontWeight: FontWeight.w500,
-              color: Colors.black87,
               letterSpacing: -0.2,
             ),
             decoration: InputDecoration(
               hintText: 'Ingresa el título del libro',
               hintStyle: TextStyle(
-                color: Colors.grey.shade400,
+                color: isDark
+                    ? AppColors.textHintDark
+                    : AppColors.textHintLight,
                 fontWeight: FontWeight.w400,
               ),
-              prefixIcon: Icon(
-                Icons.book_rounded,
-                color: Colors.grey.shade400,
-                size: 20,
+              prefixIcon: Padding(
+                padding: const EdgeInsets.all(14),
+                child: SvgPicture.asset(
+                  'assets/icons/book.svg',
+                  width: 20,
+                  height: 20,
+                  colorFilter: ColorFilter.mode(
+                    isDark ? AppColors.textHintDark : AppColors.textHintLight,
+                    BlendMode.srcIn,
+                  ),
+                ),
               ),
-              border: InputBorder.none,
+              filled: true,
+              fillColor: isDark
+                  ? theme.colorScheme.surface
+                  : const Color(0xFFF5F5F5),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: theme.colorScheme.primary.withValues(alpha: 0.3),
+                  width: 1.5,
+                ),
+              ),
+              errorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: AppColors.error, width: 1),
+              ),
+              focusedErrorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(
+                  color: AppColors.error,
+                  width: 1.5,
+                ),
+              ),
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 16,
                 vertical: 14,
@@ -577,10 +676,13 @@ class _AddBookWidgetState extends State<AddBookWidget>
   }
 
   Widget _buildUploadProgress(BookProvider bookProvider) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? theme.colorScheme.surface : Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: widget.folder.color.withValues(alpha: 0.15),
@@ -594,10 +696,11 @@ class _AddBookWidgetState extends State<AddBookWidget>
             children: [
               Text(
                 'Subiendo archivo',
-                style: TextStyle(
-                  fontSize: 13,
+                style: theme.textTheme.bodySmall?.copyWith(
                   fontWeight: FontWeight.w600,
-                  color: Colors.grey.shade700,
+                  color: isDark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondaryLight,
                 ),
               ),
               Text(
@@ -615,7 +718,7 @@ class _AddBookWidgetState extends State<AddBookWidget>
             borderRadius: BorderRadius.circular(4),
             child: LinearProgressIndicator(
               value: bookProvider.uploadProgress,
-              backgroundColor: Colors.grey.shade100,
+              backgroundColor: isDark ? AppColors.grey800 : AppColors.grey100,
               valueColor: AlwaysStoppedAnimation<Color>(widget.folder.color),
               minHeight: 6,
             ),
@@ -626,6 +729,9 @@ class _AddBookWidgetState extends State<AddBookWidget>
   }
 
   Widget _buildActionButtons(BookProvider bookProvider) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Row(
       children: [
         // Botón Cancelar
@@ -633,8 +739,12 @@ class _AddBookWidgetState extends State<AddBookWidget>
           child: Container(
             height: 50,
             decoration: BoxDecoration(
+              color: isDark ? null : const Color(0xFFF5F5F5),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey.shade200, width: 1.5),
+              border: Border.all(
+                color: isDark ? AppColors.grey700 : AppColors.grey300,
+                width: 1.5,
+              ),
             ),
             child: Material(
               color: Colors.transparent,
@@ -646,12 +756,14 @@ class _AddBookWidgetState extends State<AddBookWidget>
                 child: Center(
                   child: Text(
                     'Cancelar',
-                    style: TextStyle(
+                    style: theme.textTheme.bodyMedium?.copyWith(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
                       color: bookProvider.isUploading
-                          ? Colors.grey.shade400
-                          : Colors.grey.shade700,
+                          ? (isDark ? AppColors.grey600 : AppColors.grey400)
+                          : (isDark
+                                ? AppColors.textSecondaryDark
+                                : AppColors.textSecondaryLight),
                       letterSpacing: -0.3,
                     ),
                   ),
@@ -672,7 +784,10 @@ class _AddBookWidgetState extends State<AddBookWidget>
               borderRadius: BorderRadius.circular(12),
               gradient: bookProvider.isUploading
                   ? LinearGradient(
-                      colors: [Colors.grey.shade300, Colors.grey.shade400],
+                      colors: [
+                        isDark ? AppColors.grey700 : AppColors.grey300,
+                        isDark ? AppColors.grey800 : AppColors.grey400,
+                      ],
                     )
                   : LinearGradient(
                       colors: [
@@ -709,14 +824,18 @@ class _AddBookWidgetState extends State<AddBookWidget>
                         )
                       : Row(
                           mainAxisAlignment: MainAxisAlignment.center,
-                          children: const [
-                            Icon(
-                              Icons.check_rounded,
-                              color: Colors.white,
-                              size: 20,
+                          children: [
+                            SvgPicture.asset(
+                              'assets/icons/check.svg',
+                              width: 20,
+                              height: 20,
+                              colorFilter: const ColorFilter.mode(
+                                Colors.white,
+                                BlendMode.srcIn,
+                              ),
                             ),
-                            SizedBox(width: 8),
-                            Text(
+                            const SizedBox(width: 8),
+                            const Text(
                               'Guardar libro',
                               style: TextStyle(
                                 fontSize: 15,

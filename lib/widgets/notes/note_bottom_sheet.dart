@@ -1,4 +1,4 @@
-// lib/widgets/note_bottom_sheet.dart (REDISEÑADO - CON ICONOS SVG)
+// lib/widgets/note_bottom_sheet.dart (ADAPTADO A TEMAS CLARO/OSCURO)
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -69,10 +69,15 @@ class _NoteBottomSheetState extends State<NoteBottomSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
     return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      decoration: BoxDecoration(
+        // ✅ Blanco puro en tema claro
+        color: isDark ? colorScheme.surface : Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom,
@@ -91,7 +96,7 @@ class _NoteBottomSheetState extends State<NoteBottomSheet> {
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: Colors.grey[300],
+                      color: isDark ? AppColors.grey700 : AppColors.grey300,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -104,7 +109,7 @@ class _NoteBottomSheetState extends State<NoteBottomSheet> {
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.08),
+                        color: colorScheme.primary.withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: SvgPicture.asset(
@@ -113,8 +118,8 @@ class _NoteBottomSheetState extends State<NoteBottomSheet> {
                             : 'assets/icons/edit_note.svg',
                         width: 22,
                         height: 22,
-                        colorFilter: const ColorFilter.mode(
-                          AppColors.primary,
+                        colorFilter: ColorFilter.mode(
+                          colorScheme.primary,
                           BlendMode.srcIn,
                         ),
                       ),
@@ -122,10 +127,7 @@ class _NoteBottomSheetState extends State<NoteBottomSheet> {
                     const SizedBox(width: 12),
                     Text(
                       widget.note == null ? 'Nueva Nota' : 'Editar Nota',
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.black87,
+                      style: theme.textTheme.titleLarge?.copyWith(
                         letterSpacing: -0.5,
                       ),
                     ),
@@ -207,9 +209,16 @@ class _NoteBottomSheetState extends State<NoteBottomSheet> {
                   Container(
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
-                      color: Colors.grey[50],
+                      color: isDark
+                          ? AppColors.surfaceVariantDark
+                          : AppColors.surfaceVariantLight,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey[200]!, width: 1),
+                      border: Border.all(
+                        color: isDark
+                            ? AppColors.dividerDark
+                            : AppColors.dividerLight,
+                        width: 1,
+                      ),
                     ),
                     child: Column(
                       children: [
@@ -220,7 +229,9 @@ class _NoteBottomSheetState extends State<NoteBottomSheet> {
                               width: 18,
                               height: 18,
                               colorFilter: ColorFilter.mode(
-                                Colors.grey[600]!,
+                                isDark
+                                    ? AppColors.textSecondaryDark
+                                    : AppColors.textSecondaryLight,
                                 BlendMode.srcIn,
                               ),
                             ),
@@ -228,10 +239,8 @@ class _NoteBottomSheetState extends State<NoteBottomSheet> {
                             Expanded(
                               child: Text(
                                 'Vincular a una página',
-                                style: TextStyle(
-                                  fontSize: 14,
+                                style: theme.textTheme.bodyMedium?.copyWith(
                                   fontWeight: FontWeight.w600,
-                                  color: Colors.grey[700],
                                 ),
                               ),
                             ),
@@ -247,7 +256,6 @@ class _NoteBottomSheetState extends State<NoteBottomSheet> {
                                     }
                                   });
                                 },
-                                activeColor: AppColors.primary,
                                 materialTapTargetSize:
                                     MaterialTapTargetSize.shrinkWrap,
                               ),
@@ -331,12 +339,16 @@ class _NoteBottomSheetState extends State<NoteBottomSheet> {
   }
 
   Widget _buildLabel(String text) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Text(
       text,
-      style: TextStyle(
-        fontSize: 13,
+      style: theme.textTheme.bodySmall?.copyWith(
         fontWeight: FontWeight.w600,
-        color: Colors.grey[700],
+        color: isDark
+            ? AppColors.textSecondaryDark
+            : AppColors.textSecondaryLight,
         letterSpacing: -0.1,
       ),
     );
@@ -349,25 +361,31 @@ class _NoteBottomSheetState extends State<NoteBottomSheet> {
     TextInputType? keyboardType,
     String? Function(String?)? validator,
   }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        // ✅ Blanco puro en tema claro
+        color: isDark ? colorScheme.surface : Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey[200]!, width: 1),
+        border: Border.all(
+          color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
+          width: 1,
+        ),
       ),
       child: TextFormField(
         controller: controller,
         keyboardType: keyboardType,
-        style: TextStyle(
-          fontSize: 14,
+        style: theme.textTheme.bodyMedium?.copyWith(
           fontWeight: FontWeight.w500,
-          color: Colors.grey[800],
           letterSpacing: -0.1,
         ),
         decoration: InputDecoration(
           hintText: hint,
           hintStyle: TextStyle(
-            color: Colors.grey[400],
+            color: isDark ? AppColors.textHintDark : AppColors.textHintLight,
             fontWeight: FontWeight.w400,
           ),
           prefixIcon: Padding(
@@ -376,11 +394,15 @@ class _NoteBottomSheetState extends State<NoteBottomSheet> {
               icon,
               width: 18,
               height: 18,
-              colorFilter: ColorFilter.mode(Colors.grey[400]!, BlendMode.srcIn),
+              colorFilter: ColorFilter.mode(
+                isDark ? AppColors.textHintDark : AppColors.textHintLight,
+                BlendMode.srcIn,
+              ),
             ),
           ),
           filled: true,
-          fillColor: Colors.white,
+          // ✅ Blanco puro en tema claro
+          fillColor: isDark ? colorScheme.surface : Colors.white,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide.none,
@@ -392,17 +414,17 @@ class _NoteBottomSheetState extends State<NoteBottomSheet> {
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide(
-              color: AppColors.primary.withValues(alpha: 0.3),
+              color: colorScheme.primary.withValues(alpha: 0.3),
               width: 1.5,
             ),
           ),
           errorBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Colors.red[300]!, width: 1),
+            borderSide: const BorderSide(color: AppColors.error, width: 1),
           ),
           focusedErrorBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Colors.red[300]!, width: 1.5),
+            borderSide: const BorderSide(color: AppColors.error, width: 1.5),
           ),
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 16,
@@ -419,26 +441,32 @@ class _NoteBottomSheetState extends State<NoteBottomSheet> {
     required String hint,
     String? Function(String?)? validator,
   }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        // ✅ Blanco puro en tema claro
+        color: isDark ? colorScheme.surface : Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey[200]!, width: 1),
+        border: Border.all(
+          color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
+          width: 1,
+        ),
       ),
       child: TextFormField(
         controller: controller,
         maxLines: 5,
-        style: TextStyle(
-          fontSize: 14,
+        style: theme.textTheme.bodyMedium?.copyWith(
           fontWeight: FontWeight.w500,
-          color: Colors.grey[800],
           letterSpacing: -0.1,
           height: 1.5,
         ),
         decoration: InputDecoration(
           hintText: hint,
           hintStyle: TextStyle(
-            color: Colors.grey[400],
+            color: isDark ? AppColors.textHintDark : AppColors.textHintLight,
             fontWeight: FontWeight.w400,
           ),
           prefixIcon: Padding(
@@ -447,11 +475,15 @@ class _NoteBottomSheetState extends State<NoteBottomSheet> {
               'assets/icons/description.svg',
               width: 18,
               height: 18,
-              colorFilter: ColorFilter.mode(Colors.grey[400]!, BlendMode.srcIn),
+              colorFilter: ColorFilter.mode(
+                isDark ? AppColors.textHintDark : AppColors.textHintLight,
+                BlendMode.srcIn,
+              ),
             ),
           ),
           filled: true,
-          fillColor: Colors.white,
+          // ✅ Blanco puro en tema claro
+          fillColor: isDark ? colorScheme.surface : Colors.white,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide.none,
@@ -463,17 +495,17 @@ class _NoteBottomSheetState extends State<NoteBottomSheet> {
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide(
-              color: AppColors.primary.withValues(alpha: 0.3),
+              color: colorScheme.primary.withValues(alpha: 0.3),
               width: 1.5,
             ),
           ),
           errorBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Colors.red[300]!, width: 1),
+            borderSide: const BorderSide(color: AppColors.error, width: 1),
           ),
           focusedErrorBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Colors.red[300]!, width: 1.5),
+            borderSide: const BorderSide(color: AppColors.error, width: 1.5),
           ),
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 16,
@@ -492,6 +524,10 @@ class _NoteBottomSheetState extends State<NoteBottomSheet> {
     required List<Map<String, dynamic>> items,
     required Function(String?) onChanged,
   }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
     final selectedLabel = value == null
         ? hint
         : items.firstWhere(
@@ -505,9 +541,13 @@ class _NoteBottomSheetState extends State<NoteBottomSheet> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          color: Colors.white,
+          // ✅ Blanco puro en tema claro
+          color: isDark ? colorScheme.surface : Colors.white,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.grey[200]!, width: 1),
+          border: Border.all(
+            color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
+            width: 1,
+          ),
         ),
         child: Row(
           children: [
@@ -515,16 +555,22 @@ class _NoteBottomSheetState extends State<NoteBottomSheet> {
               icon,
               width: 18,
               height: 18,
-              colorFilter: ColorFilter.mode(Colors.grey[400]!, BlendMode.srcIn),
+              colorFilter: ColorFilter.mode(
+                isDark ? AppColors.textHintDark : AppColors.textHintLight,
+                BlendMode.srcIn,
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
                 selectedLabel,
-                style: TextStyle(
-                  fontSize: 14,
+                style: theme.textTheme.bodyMedium?.copyWith(
                   fontWeight: FontWeight.w500,
-                  color: value == null ? Colors.grey[400] : Colors.grey[800],
+                  color: value == null
+                      ? (isDark
+                            ? AppColors.textHintDark
+                            : AppColors.textHintLight)
+                      : colorScheme.onSurface,
                   letterSpacing: -0.1,
                 ),
                 overflow: TextOverflow.ellipsis,
@@ -532,7 +578,7 @@ class _NoteBottomSheetState extends State<NoteBottomSheet> {
             ),
             Icon(
               Icons.keyboard_arrow_down_rounded,
-              color: Colors.grey[400],
+              color: isDark ? AppColors.textHintDark : AppColors.textHintLight,
               size: 20,
             ),
           ],
@@ -546,6 +592,10 @@ class _NoteBottomSheetState extends State<NoteBottomSheet> {
     Function(String?) onChanged,
     String? currentValue,
   ) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -554,9 +604,10 @@ class _NoteBottomSheetState extends State<NoteBottomSheet> {
         constraints: BoxConstraints(
           maxHeight: MediaQuery.of(context).size.height * 0.7,
         ),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        decoration: BoxDecoration(
+          // ✅ Blanco puro en tema claro
+          color: isDark ? colorScheme.surface : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -569,7 +620,7 @@ class _NoteBottomSheetState extends State<NoteBottomSheet> {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: Colors.grey[300],
+                    color: isDark ? AppColors.grey700 : AppColors.grey300,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -582,16 +633,17 @@ class _NoteBottomSheetState extends State<NoteBottomSheet> {
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Text(
                 'Seleccionar opción',
-                style: TextStyle(
-                  fontSize: 18,
+                style: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w700,
-                  color: Colors.grey[800],
                   letterSpacing: -0.5,
                 ),
               ),
             ),
             const SizedBox(height: 12),
-            Divider(height: 1, color: Colors.grey[200]),
+            Divider(
+              height: 1,
+              color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
+            ),
 
             // Lista de opciones
             Flexible(
@@ -604,7 +656,9 @@ class _NoteBottomSheetState extends State<NoteBottomSheet> {
                   thickness: 0.5,
                   indent: 20,
                   endIndent: 20,
-                  color: Colors.grey[200],
+                  color: isDark
+                      ? AppColors.dividerDark
+                      : AppColors.dividerLight,
                 ),
                 itemBuilder: (context, index) {
                   final item = items[index];
@@ -623,21 +677,21 @@ class _NoteBottomSheetState extends State<NoteBottomSheet> {
                           vertical: 16,
                         ),
                         color: isSelected
-                            ? AppColors.primary.withValues(alpha: 0.04)
+                            ? colorScheme.primary.withValues(alpha: 0.04)
                             : Colors.transparent,
                         child: Row(
                           children: [
                             Expanded(
                               child: Text(
                                 item['label'] as String,
-                                style: TextStyle(
+                                style: theme.textTheme.bodyMedium?.copyWith(
                                   fontSize: 15,
                                   fontWeight: isSelected
                                       ? FontWeight.w600
                                       : FontWeight.w500,
                                   color: isSelected
-                                      ? AppColors.primary
-                                      : Colors.grey[800],
+                                      ? colorScheme.primary
+                                      : colorScheme.onSurface,
                                   letterSpacing: -0.1,
                                 ),
                               ),
@@ -645,7 +699,7 @@ class _NoteBottomSheetState extends State<NoteBottomSheet> {
                             if (isSelected)
                               Icon(
                                 Icons.check_rounded,
-                                color: AppColors.primary,
+                                color: colorScheme.primary,
                                 size: 20,
                               ),
                           ],
@@ -666,12 +720,20 @@ class _NoteBottomSheetState extends State<NoteBottomSheet> {
     required String label,
     required VoidCallback? onPressed,
   }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
     return Container(
       height: 48,
       decoration: BoxDecoration(
-        color: Colors.white,
+        // ✅ Blanco puro en tema claro
+        color: isDark ? colorScheme.surface : Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey[300]!, width: 1),
+        border: Border.all(
+          color: isDark ? AppColors.grey700 : AppColors.grey300,
+          width: 1,
+        ),
       ),
       child: Material(
         color: Colors.transparent,
@@ -681,10 +743,9 @@ class _NoteBottomSheetState extends State<NoteBottomSheet> {
           child: Center(
             child: Text(
               label,
-              style: TextStyle(
+              style: theme.textTheme.bodyMedium?.copyWith(
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
-                color: Colors.grey[700],
                 letterSpacing: -0.2,
               ),
             ),
@@ -699,19 +760,22 @@ class _NoteBottomSheetState extends State<NoteBottomSheet> {
     required VoidCallback? onPressed,
     bool isLoading = false,
   }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Container(
       height: 48,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
         gradient: LinearGradient(
           colors: [
-            AppColors.primary,
-            AppColors.primary.withValues(alpha: 0.85),
+            colorScheme.primary,
+            colorScheme.primary.withValues(alpha: 0.85),
           ],
         ),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.25),
+            color: colorScheme.primary.withValues(alpha: 0.25),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -724,20 +788,22 @@ class _NoteBottomSheetState extends State<NoteBottomSheet> {
           onTap: onPressed,
           child: Center(
             child: isLoading
-                ? const SizedBox(
+                ? SizedBox(
                     height: 20,
                     width: 20,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        colorScheme.onPrimary,
+                      ),
                     ),
                   )
                 : Text(
                     label,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
-                      color: Colors.white,
+                      color: colorScheme.onPrimary,
                       letterSpacing: -0.2,
                     ),
                   ),
@@ -817,7 +883,7 @@ class _NoteBottomSheetState extends State<NoteBottomSheet> {
                 ? 'Nota creada exitosamente'
                 : 'Nota actualizada',
           ),
-          backgroundColor: Colors.green[400],
+          backgroundColor: AppColors.success,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
@@ -826,13 +892,10 @@ class _NoteBottomSheetState extends State<NoteBottomSheet> {
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Error al guardar la nota'),
-          backgroundColor: Colors.red[400],
+        const SnackBar(
+          content: Text('Error al guardar la nota'),
+          backgroundColor: AppColors.error,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
         ),
       );
     }
