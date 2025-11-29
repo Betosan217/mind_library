@@ -9,7 +9,16 @@
   [![Platform](https://img.shields.io/badge/Platform-Android%208.0+-green.svg)](https://www.android.com/)
   
 </div>
-
+<div align="center">
+  ![Typing SVG](https://readme-typing-svg.herokuapp.com?font=Fira+Code&pause=1000&color=6366F1&center=true&vCenter=true&width=435&lines=Organiza+tu+biblioteca;Anota+mientras+lees;Gestiona+tus+tareas;Todo+en+una+app)
+    
+  ![Books](https://media.giphy.com/media/l0HlNQ03J5JxX6lva/giphy.gif)
+  
+  ![Flutter](https://img.shields.io/badge/Flutter-02569B?style=for-the-badge&logo=flutter&logoColor=white)
+  ![Android](https://img.shields.io/badge/Android-3DDC84?style=for-the-badge&logo=android&logoColor=white)
+  ![Status](https://img.shields.io/badge/Status-Active-success?style=for-the-badge)
+  
+</div>
 ## ⚙️ Requisitos
 
 - Android 8.0 (Oreo) o superior
