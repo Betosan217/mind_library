@@ -20,6 +20,10 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   bool _showCompleted = true;
   bool _showPending = true;
 
+  // 🆕 Listas anteriores para detectar cambios
+  List<TaskModel> _previousPendingTasks = [];
+  List<TaskModel> _previousCompletedTasks = [];
+
   @override
   void initState() {
     super.initState();
@@ -65,9 +69,12 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         builder: (context, taskProvider, child) {
           final allTasks = taskProvider.getTasksForGroup(widget.taskGroup.id);
 
+          final pendingTasks = allTasks.where((t) => !t.isCompleted).toList();
+          final completedTasks = allTasks.where((t) => t.isCompleted).toList();
+
           final totalTasks = allTasks.length;
-          final completedTasks = allTasks.where((t) => t.isCompleted).length;
-          final pendingTasks = totalTasks - completedTasks;
+          final completedCount = completedTasks.length;
+          final pendingCount = pendingTasks.length;
 
           return Column(
             children: [
@@ -107,19 +114,26 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                     ),
                     _buildStatItem(
                       label: 'Completadas',
-                      value: '$completedTasks',
+                      value: '$completedCount',
                     ),
                     Container(
                       height: 25,
                       width: 1,
                       color: Colors.white.withValues(alpha: 0.3),
                     ),
-                    _buildStatItem(label: 'Pendientes', value: '$pendingTasks'),
+                    _buildStatItem(label: 'Pendientes', value: '$pendingCount'),
                   ],
                 ),
               ),
 
-              Expanded(child: _buildTasksList(allTasks, taskProvider, isDark)),
+              Expanded(
+                child: _buildTasksList(
+                  pendingTasks,
+                  completedTasks,
+                  taskProvider,
+                  isDark,
+                ),
+              ),
             ],
           );
         },
@@ -137,11 +151,12 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   }
 
   Widget _buildTasksList(
-    List<TaskModel> allTasks,
+    List<TaskModel> pendingTasks,
+    List<TaskModel> completedTasks,
     TaskProvider taskProvider,
     bool isDark,
   ) {
-    if (allTasks.isEmpty) {
+    if (pendingTasks.isEmpty && completedTasks.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -179,16 +194,14 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       );
     }
 
-    final pendingTasksList = allTasks.where((t) => !t.isCompleted).toList();
-    final completedTasksList = allTasks.where((t) => t.isCompleted).toList();
-
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       children: [
-        if (pendingTasksList.isNotEmpty) ...[
+        // SECCIÓN DE PENDIENTES
+        if (pendingTasks.isNotEmpty) ...[
           _buildSectionHeader(
             'Pendientes',
-            pendingTasksList.length,
+            pendingTasks.length,
             _showPending,
             () {
               setState(() {
@@ -198,16 +211,46 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
             isDark,
           ),
           if (_showPending)
-            ...pendingTasksList.map(
-              (task) => _buildTaskItem(context, task, taskProvider, isDark),
-            ),
+            // 🆕 AnimatedList mejorado
+            ...pendingTasks.map((task) {
+              final wasInCompleted = _previousCompletedTasks.any(
+                (t) => t.id == task.id,
+              );
+              final key = ValueKey('pending_${task.id}');
+
+              return AnimatedSwitcher(
+                key: key,
+                duration: const Duration(milliseconds: 400),
+                switchInCurve: Curves.easeOutCubic,
+                switchOutCurve: Curves.easeInCubic,
+                transitionBuilder: (child, animation) {
+                  // Si venía de completadas, animar desde abajo
+                  final offsetTween = wasInCompleted
+                      ? Tween<Offset>(
+                          begin: const Offset(0, 0.3),
+                          end: Offset.zero,
+                        )
+                      : Tween<Offset>(
+                          begin: const Offset(0, -0.3),
+                          end: Offset.zero,
+                        );
+
+                  return SlideTransition(
+                    position: animation.drive(offsetTween),
+                    child: FadeTransition(opacity: animation, child: child),
+                  );
+                },
+                child: _buildTaskItem(context, task, taskProvider, isDark),
+              );
+            }),
           const SizedBox(height: 16),
         ],
 
-        if (completedTasksList.isNotEmpty) ...[
+        // SECCIÓN DE COMPLETADAS
+        if (completedTasks.isNotEmpty) ...[
           _buildSectionHeader(
             'Completadas',
-            completedTasksList.length,
+            completedTasks.length,
             _showCompleted,
             () {
               setState(() {
@@ -217,9 +260,37 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
             isDark,
           ),
           if (_showCompleted)
-            ...completedTasksList.map(
-              (task) => _buildTaskItem(context, task, taskProvider, isDark),
-            ),
+            ...completedTasks.map((task) {
+              final wasInPending = _previousPendingTasks.any(
+                (t) => t.id == task.id,
+              );
+              final key = ValueKey('completed_${task.id}');
+
+              return AnimatedSwitcher(
+                key: key,
+                duration: const Duration(milliseconds: 400),
+                switchInCurve: Curves.easeOutCubic,
+                switchOutCurve: Curves.easeInCubic,
+                transitionBuilder: (child, animation) {
+                  // Si venía de pendientes, animar desde arriba
+                  final offsetTween = wasInPending
+                      ? Tween<Offset>(
+                          begin: const Offset(0, -0.3),
+                          end: Offset.zero,
+                        )
+                      : Tween<Offset>(
+                          begin: const Offset(0, 0.3),
+                          end: Offset.zero,
+                        );
+
+                  return SlideTransition(
+                    position: animation.drive(offsetTween),
+                    child: FadeTransition(opacity: animation, child: child),
+                  );
+                },
+                child: _buildTaskItem(context, task, taskProvider, isDark),
+              );
+            }),
         ],
       ],
     );
@@ -308,7 +379,6 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     );
   }
 
-  // 🎨 DISEÑO DE TAREA MEJORADO - Más compacto y moderno
   Widget _buildTaskItem(
     BuildContext context,
     TaskModel task,
@@ -388,16 +458,31 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         ),
         child: Row(
           children: [
-            // ✅ CHECKBOX MEJORADO - Más suave y minimalista
+            // ✅ CHECKBOX ANIMADO
             GestureDetector(
               onTap: () {
+                // 🆕 Guardar listas anteriores antes del cambio
+                setState(() {
+                  final allTasks = context
+                      .read<TaskProvider>()
+                      .getTasksForGroup(widget.taskGroup.id);
+                  _previousPendingTasks = allTasks
+                      .where((t) => !t.isCompleted)
+                      .toList();
+                  _previousCompletedTasks = allTasks
+                      .where((t) => t.isCompleted)
+                      .toList();
+                });
+
                 taskProvider.toggleTaskCompletion(
                   taskId: task.id,
                   taskGroupId: widget.taskGroup.id,
                   isCompleted: !task.isCompleted,
                 );
               },
-              child: Container(
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeInOut,
                 width: 24,
                 height: 24,
                 decoration: BoxDecoration(
@@ -415,7 +500,11 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: task.isCompleted
-                    ? Icon(Icons.check_rounded, color: Colors.white, size: 16)
+                    ? const Icon(
+                        Icons.check_rounded,
+                        color: Colors.white,
+                        size: 16,
+                      )
                     : null,
               ),
             ),
@@ -426,8 +515,8 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    task.title,
+                  AnimatedDefaultTextStyle(
+                    duration: const Duration(milliseconds: 250),
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w500,
@@ -446,6 +535,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                           : AppColors.textSecondaryLight,
                       decorationThickness: 1.5,
                     ),
+                    child: Text(task.title),
                   ),
                   if (task.dueDate != null || task.reminderDate != null) ...[
                     const SizedBox(height: 4),
@@ -508,7 +598,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
               ),
             ),
 
-            // 🔘 BOTÓN DE MENÚ (3 PUNTOS)
+            // 🔘 BOTÓN DE MENÚ
             IconButton(
               icon: Icon(
                 Icons.more_horiz_rounded,
@@ -530,7 +620,6 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     );
   }
 
-  // 🎯 MENÚ DE OPCIONES DE LA TAREA
   void _showTaskOptions(
     BuildContext context,
     TaskModel task,
