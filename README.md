@@ -25,11 +25,6 @@
 - Teléfono: +502 50340893
 - Universidad de Occidente
 
-## 📄 Licencia
-
-Este proyecto está bajo la Licencia [MIT/GPL/otra] - ver el archivo [LICENSE](LICENSE) para más detalles.
-
----
 
 <div align="center">  
   Si te gusta el proyecto, dale una ⭐
