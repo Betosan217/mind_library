@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="lib/assets/wolib_logo.png" alt="Wolib Logo" width="200"/>
+  <img src="assets/wolib_icon.png" alt="Wolib Logo" width="200"/>
 </div>
 <div align="center">
   <img src="assets/logo.png" alt="Wolib Logo" width="200"/>
