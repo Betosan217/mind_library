@@ -25,8 +25,3 @@
 - Teléfono: +502 50340893
 - Universidad de Occidente
 
-
-<div align="center">  
-  Si te gusta el proyecto, dale una ⭐
-</div>
-```
