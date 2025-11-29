@@ -20,7 +20,7 @@
 
 **Norberto Raymundo Arreaga Sánchez**
 
-- Instagram: [@norberto_arreaga](https://www.instagram.com/norberto_arreaga)
+- Instagram: [@norberto__arreaga](https://www.instagram.com/norberto__arreaga)
 - Email: norbertosan98@gmail.com
 - Teléfono: +502 50340893
 - Universidad de Occidente
