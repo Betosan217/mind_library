@@ -1,16 +1,40 @@
-# mind_library
+<div align="center">
+  <img src="lib/assets/wolib_logo.png" alt="Wolib Logo" width="200"/>
+</div>
+<div align="center">
+  <img src="assets/logo.png" alt="Wolib Logo" width="200"/>
+  
+  # Wolib - Workspace Library
+  
+  Una aplicación móvil para organizar y gestionar tu colección de libros con notas y tareas integradas.
+  
+  [![Flutter Version](https://img.shields.io/badge/Flutter-3.0+-blue.svg)](https://flutter.dev/)
+  [![Platform](https://img.shields.io/badge/Platform-Android%208.0+-green.svg)](https://www.android.com/)
+  
+</div>
 
-A new Flutter project.
+## ⚙️ Requisitos
 
-## Getting Started
+- Android 8.0 (Oreo) o superior
+- Mínimo 100MB de espacio de almacenamiento
+- Conexión a Internet (para registro y sincronización)
+- Flutter 3.0+ (para desarrollo)
+## 👤 Autor
 
-This project is a starting point for a Flutter application.
+**Norberto Raymundo Arreaga Sánchez**
 
-A few resources to get you started if this is your first Flutter project:
+- Instagram: [@norberto_arreaga](https://www.instagram.com/norberto_arreaga)
+- Email: norbertosan98@gmail.com
+- Teléfono: +502 50340893
+- Universidad de Occidente
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+## 📄 Licencia
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+Este proyecto está bajo la Licencia [MIT/GPL/otra] - ver el archivo [LICENSE](LICENSE) para más detalles.
+
+---
+
+<div align="center">  
+  Si te gusta el proyecto, dale una ⭐
+</div>
+```
